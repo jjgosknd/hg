@@ -40,9 +40,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.panfil.carlog.R
 import com.panfil.carlog.domain.MaintenanceRecommendation
 import com.panfil.carlog.domain.RecommendationStatus
+import com.panfil.carlog.ui.theme.AppGradients
 import java.text.NumberFormat
 import java.util.Locale
 
@@ -72,19 +72,38 @@ private val numberFormat = NumberFormat.getNumberInstance(Locale("ru", "RU"))
 fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+    ) {
+        // Gradient header in line with the rest of the app
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(AppGradients.Brand),
+        ) {
+            Column(
+                modifier = Modifier.padding(
+                    start = 20.dp, end = 20.dp,
+                    top = 24.dp, bottom = 24.dp,
+                ),
+            ) {
                 Text(
                     stringResource(R.string.tab_analytics),
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.SemiBold,
                 )
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                titleContentColor = MaterialTheme.colorScheme.onPrimary,
-            ),
-        )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Расходы и состояние ТО",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                )
+            }
+        }
 
         Column(
             modifier = Modifier

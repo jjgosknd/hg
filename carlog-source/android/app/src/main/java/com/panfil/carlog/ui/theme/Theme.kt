@@ -7,50 +7,95 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-private val Purple = Color(0xFF6C5CE7)
-private val PurpleLight = Color(0xFF9B8FEF)
-private val PurpleDark = Color(0xFF4A3DB8)
-private val Teal = Color(0xFF00BFA5)
-private val TealDark = Color(0xFF26A69A)
+/**
+ * Современная палитра CarLog: глубокий индиго + электрический циан + янтарный
+ * акцент. Светлая тема стремится к "slate / ice" фону, тёмная — к насыщенному
+ * сине-чёрному без угольной серости.
+ */
+
+// Brand
+val BrandIndigo = Color(0xFF4F46E5)       // primary
+val BrandIndigoDeep = Color(0xFF312E81)
+val BrandIndigoSoft = Color(0xFF818CF8)
+val BrandViolet = Color(0xFF7C3AED)
+val BrandCyan = Color(0xFF06B6D4)         // secondary
+val BrandCyanSoft = Color(0xFF22D3EE)
+val BrandAmber = Color(0xFFF59E0B)        // tertiary
+val BrandRose = Color(0xFFEF4444)
+val BrandEmerald = Color(0xFF10B981)
 
 private val LightColors = lightColorScheme(
-    primary = Purple,
+    primary = BrandIndigo,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFEDE7FF),
-    onPrimaryContainer = Color(0xFF1D0060),
-    secondary = Teal,
+    primaryContainer = Color(0xFFE0E7FF),
+    onPrimaryContainer = Color(0xFF1E1B4B),
+
+    secondary = BrandCyan,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFB2DFDB),
-    onSecondaryContainer = Color(0xFF00332C),
-    background = Color(0xFFF8F6FF),
-    onBackground = Color(0xFF1C1B1F),
+    secondaryContainer = Color(0xFFCFFAFE),
+    onSecondaryContainer = Color(0xFF083344),
+
+    tertiary = BrandAmber,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFEF3C7),
+    onTertiaryContainer = Color(0xFF451A03),
+
+    background = Color(0xFFF6F7FB),
+    onBackground = Color(0xFF0F172A),
     surface = Color.White,
-    onSurface = Color(0xFF1C1B1F),
-    surfaceVariant = Color(0xFFF0EDFA),
-    onSurfaceVariant = Color(0xFF49454F),
-    outline = Color(0xFF79747E),
-    error = Color(0xFFE53935),
+    onSurface = Color(0xFF0F172A),
+    surfaceVariant = Color(0xFFEEF2F7),
+    onSurfaceVariant = Color(0xFF475569),
+    surfaceTint = BrandIndigo,
+    inverseSurface = Color(0xFF1E293B),
+    inverseOnSurface = Color(0xFFF8FAFC),
+
+    outline = Color(0xFFCBD5E1),
+    outlineVariant = Color(0xFFE2E8F0),
+
+    error = Color(0xFFDC2626),
     onError = Color.White,
+    errorContainer = Color(0xFFFEE2E2),
+    onErrorContainer = Color(0xFF7F1D1D),
+
+    scrim = Color(0xCC0F172A),
 )
 
 private val DarkColors = darkColorScheme(
-    primary = PurpleLight,
-    onPrimary = Color(0xFF1D0060),
-    primaryContainer = PurpleDark,
-    onPrimaryContainer = Color(0xFFEDE7FF),
-    secondary = TealDark,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFF004D40),
-    onSecondaryContainer = Color(0xFFB2DFDB),
-    background = Color(0xFF121212),
-    onBackground = Color(0xFFE6E1E5),
-    surface = Color(0xFF1E1E1E),
-    onSurface = Color(0xFFE6E1E5),
-    surfaceVariant = Color(0xFF2D2D30),
-    onSurfaceVariant = Color(0xFFCAC4D0),
-    outline = Color(0xFF938F99),
-    error = Color(0xFFEF5350),
-    onError = Color.White,
+    primary = BrandIndigoSoft,
+    onPrimary = Color(0xFF1E1B4B),
+    primaryContainer = BrandIndigoDeep,
+    onPrimaryContainer = Color(0xFFE0E7FF),
+
+    secondary = BrandCyanSoft,
+    onSecondary = Color(0xFF083344),
+    secondaryContainer = Color(0xFF155E75),
+    onSecondaryContainer = Color(0xFFCFFAFE),
+
+    tertiary = Color(0xFFFBBF24),
+    onTertiary = Color(0xFF451A03),
+    tertiaryContainer = Color(0xFF92400E),
+    onTertiaryContainer = Color(0xFFFEF3C7),
+
+    background = Color(0xFF0B0F1A),
+    onBackground = Color(0xFFE2E8F0),
+    surface = Color(0xFF111827),
+    onSurface = Color(0xFFE2E8F0),
+    surfaceVariant = Color(0xFF1E293B),
+    onSurfaceVariant = Color(0xFFCBD5E1),
+    surfaceTint = BrandIndigoSoft,
+    inverseSurface = Color(0xFFE2E8F0),
+    inverseOnSurface = Color(0xFF1E293B),
+
+    outline = Color(0xFF475569),
+    outlineVariant = Color(0xFF334155),
+
+    error = Color(0xFFF87171),
+    onError = Color(0xFF7F1D1D),
+    errorContainer = Color(0xFF7F1D1D),
+    onErrorContainer = Color(0xFFFEE2E2),
+
+    scrim = Color(0xEE000000),
 )
 
 @Composable

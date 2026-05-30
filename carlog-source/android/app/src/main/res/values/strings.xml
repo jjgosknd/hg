@@ -94,4 +94,39 @@
     <string name="rec_all_done">Все рекомендации выполнены</string>
     <string name="rec_dismiss_all">Убрать все рекомендации</string>
     <string name="rec_restore_all">Восстановить рекомендации</string>
+
+    <!-- Home redesign -->
+    <string name="current_mileage_label">Текущий пробег</string>
+    <string name="add_car_subtitle">Добавьте марку, модель и пробег, чтобы начать</string>
+    <string name="qa_expenses">Расход</string>
+    <string name="qa_maintenance">ТО</string>
+    <string name="qa_analytics">Аналитика</string>
+    <string name="stat_monthly">За месяц</string>
+    <string name="stat_monthly_sub">все расходы</string>
+    <string name="stat_mileage">Пробег</string>
+    <string name="stat_mileage_sub">всего</string>
+    <string name="stat_overdue">Просрочено</string>
+    <string name="stat_overdue_sub_warn">требует внимания</string>
+    <string name="stat_overdue_sub_ok">всё в норме</string>
+    <string name="stat_upcoming">Плановое ТО</string>
+    <string name="stat_upcoming_sub">в плане</string>
+    <string name="see_all">Все</string>
+    <string name="maintenance_empty_hint">Добавьте плановое ТО, чтобы получать напоминания</string>
+
+    <!-- Expenses redesign -->
+    <string name="period_total">Итого</string>
+    <string name="period_count">записей: %1$d</string>
+    <string name="add_short">Добавить</string>
+    <string name="empty_expenses_title">Пока пусто</string>
+    <string name="empty_expenses_hint">Нажмите «+», чтобы добавить первый расход</string>
+
+    <!-- Maintenance redesign -->
+    <string name="maint_count_total">Всего: %1$d</string>
+    <string name="maint_count_overdue">Просрочено: %1$d</string>
+    <string name="maint_count_ok">В порядке: %1$d</string>
+    <string name="maint_status_overdue">Просрочено</string>
+    <string name="maint_status_ok">В порядке</string>
+    <string name="maint_no_interval">Без интервала</string>
+    <string name="empty_maintenance_title">Тут будут плановые ТО</string>
+    <string name="empty_maintenance_hint">Добавьте пункт, чтобы видеть прогресс и получать напоминания</string>
 </resources>
