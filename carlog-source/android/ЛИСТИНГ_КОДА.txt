@@ -1,0 +1,4566 @@
+ПРИЛОЖЕНИЕ «CARLOG» — ЛИСТИНГ ИСХОДНОГО КОДА
+================================================
+
+
+────────────────────────────────────────────────
+Листинг 1 — AndroidManifest.xml
+────────────────────────────────────────────────
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application
+        android:name=".CarLogApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CarLog">
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.CarLog">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
+
+
+────────────────────────────────────────────────
+Листинг 2 — build.gradle.kts
+────────────────────────────────────────────────
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.serialization")
+    id("com.google.devtools.ksp")
+    id("com.google.dagger.hilt.android")
+}
+
+android {
+    namespace = "com.panfil.carlog"
+    compileSdk = 34
+
+    defaultConfig {
+        applicationId = "com.panfil.carlog"
+        minSdk = 26
+        targetSdk = 34
+        versionCode = 1
+        versionName = "1.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+    }
+}
+
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2024.06.00")
+    implementation(composeBom)
+    androidTestImplementation(composeBom)
+
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-graphics")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material-icons-extended")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+
+    implementation("com.google.dagger:hilt-android:2.51.1")
+    ksp("com.google.dagger:hilt-compiler:2.51.1")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+
+    // Room
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
+    // WorkManager for notifications
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    ksp("androidx.hilt:hilt-compiler:1.2.0")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("com.google.truth:truth:1.4.4")
+}
+
+
+────────────────────────────────────────────────
+Листинг 3 — CarLogApp.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog
+
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
+import dagger.hilt.android.HiltAndroidApp
+import javax.inject.Inject
+
+@HiltAndroidApp
+class CarLogApp : Application(), Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            CHANNEL_MAINTENANCE,
+            "Напоминания о ТО",
+            NotificationManager.IMPORTANCE_HIGH,
+        ).apply {
+            description = "Уведомления о предстоящем техобслуживании"
+        }
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(channel)
+    }
+
+    companion object {
+        const val CHANNEL_MAINTENANCE = "maintenance_reminders"
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 4 — MainActivity.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import com.panfil.carlog.data.prefs.PrefsStore
+import com.panfil.carlog.ui.navigation.AppRoot
+import com.panfil.carlog.ui.theme.CarLogTheme
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var prefsStore: PrefsStore
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setContent {
+            val useSystem by prefsStore.useSystemTheme.collectAsState(initial = true)
+            val darkPref by prefsStore.darkTheme.collectAsState(initial = false)
+            val dark = if (useSystem) isSystemInDarkTheme() else darkPref
+
+            CarLogTheme(darkTheme = dark) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    AppRoot()
+                }
+            }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 5 — Models.kt (доменные модели)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.domain
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+import kotlinx.serialization.Serializable
+
+@Entity(tableName = "expenses")
+data class Expense(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val type: ExpenseType = ExpenseType.FUEL,
+    val amount: Double = 0.0,
+    val mileage: Int = 0,
+    val date: Long = System.currentTimeMillis(),
+    val description: String = "",
+)
+
+@Entity(tableName = "maintenance")
+data class Maintenance(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String = "",
+    val mileageInterval: Int = 0,
+    val monthsInterval: Int = 0,
+    val lastMileage: Int = 0,
+    val lastDate: Long = System.currentTimeMillis(),
+    val notifyEnabled: Boolean = true,
+)
+
+@Serializable
+data class CarInfo(
+    val brand: String = "",
+    val model: String = "",
+    val generation: String = "",
+    val yearFrom: Int = 0,
+    val yearTo: Int = 0,
+    val mileage: Int = 0,
+)
+
+enum class ExpenseType(val label: String) {
+    FUEL("Топливо"),
+    PARTS("Запчасти"),
+    TIRES("Шины"),
+    WASH("Мойка"),
+    OIL_CHANGE("Замена масла"),
+    SERVICE("Сервис"),
+    INSURANCE("Страховка"),
+    OTHER("Другое"),
+}
+
+data class MaintenanceRecommendation(
+    val title: String,
+    val description: String,
+    val mileageInterval: Int,
+    val monthsInterval: Int,
+    val status: RecommendationStatus,
+    val nextDueMileage: Int,
+    val overdueByKm: Int = 0,
+)
+
+enum class RecommendationStatus { OVERDUE, UPCOMING, OK }
+
+enum class FilterPeriod(val label: String) {
+    ALL("Все"),
+    WEEK("Неделя"),
+    MONTH("Месяц"),
+    QUARTER("Квартал"),
+    YEAR("Год"),
+    CUSTOM("Период"),
+}
+
+
+────────────────────────────────────────────────
+Листинг 6 — RecommendationProvider.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.domain
+
+object RecommendationProvider {
+
+    private data class Template(
+        val title: String,
+        val description: String,
+        val mileageInterval: Int,
+        val monthsInterval: Int,
+    )
+
+    private val templates = listOf(
+        Template("Замена моторного масла", "Регулярная замена масла продлевает ресурс двигателя", 10_000, 12),
+        Template("Замена масляного фильтра", "Менять вместе с маслом для чистоты смазки", 10_000, 12),
+        Template("Замена воздушного фильтра", "Чистый фильтр улучшает динамику и снижает расход", 20_000, 24),
+        Template("Замена салонного фильтра", "Обеспечивает чистый воздух в салоне", 15_000, 12),
+        Template("Замена тормозных колодок", "Изношенные колодки увеличивают тормозной путь", 30_000, 0),
+        Template("Замена тормозных дисков", "Проверяйте толщину и состояние поверхности", 60_000, 0),
+        Template("Замена свечей зажигания", "Влияют на запуск и стабильность работы двигателя", 30_000, 0),
+        Template("Замена охлаждающей жидкости", "Предотвращает перегрев и коррозию системы охлаждения", 60_000, 36),
+        Template("Замена тормозной жидкости", "Старая жидкость теряет свойства и может закипеть", 40_000, 24),
+        Template("Замена ремня ГРМ", "Обрыв ремня приводит к серьёзным повреждениям двигателя", 90_000, 60),
+        Template("Замена трансмиссионного масла", "Поддерживает плавность переключений и ресурс КПП", 60_000, 48),
+        Template("Проверка и ротация шин", "Равномерный износ увеличивает срок службы шин", 10_000, 12),
+        Template("Развал-схождение", "Правильные углы снижают износ шин и улучшают управляемость", 20_000, 12),
+        Template("Замена топливного фильтра", "Чистый фильтр защищает форсунки и топливный насос", 40_000, 24),
+        Template("Диагностика подвески", "Своевременная проверка предотвращает дорогой ремонт", 30_000, 24),
+    )
+
+    fun generate(
+        currentMileage: Int,
+        existingMaintenance: List<Maintenance>,
+    ): List<MaintenanceRecommendation> {
+        if (currentMileage <= 0) return emptyList()
+
+        return templates.map { t ->
+            val matching = existingMaintenance.filter {
+                it.title.contains(t.title, ignoreCase = true) ||
+                    t.title.contains(it.title, ignoreCase = true)
+            }
+            val lastMileage = matching.maxOfOrNull { it.lastMileage } ?: 0
+            val nextDue = if (lastMileage > 0) lastMileage + t.mileageInterval else t.mileageInterval
+            val remaining = nextDue - currentMileage
+            val status = when {
+                remaining <= 0 -> RecommendationStatus.OVERDUE
+                remaining <= t.mileageInterval * 0.15 -> RecommendationStatus.UPCOMING
+                else -> RecommendationStatus.OK
+            }
+            MaintenanceRecommendation(
+                title = t.title,
+                description = t.description,
+                mileageInterval = t.mileageInterval,
+                monthsInterval = t.monthsInterval,
+                status = status,
+                nextDueMileage = nextDue,
+                overdueByKm = if (remaining < 0) -remaining else 0,
+            )
+        }.sortedBy { it.status.ordinal }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 7 — CarLogDatabase.kt (Room БД)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.db
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.Maintenance
+
+@Database(entities = [Expense::class, Maintenance::class], version = 1, exportSchema = false)
+@TypeConverters(Converters::class)
+abstract class CarLogDatabase : RoomDatabase() {
+    abstract fun expenseDao(): ExpenseDao
+    abstract fun maintenanceDao(): MaintenanceDao
+}
+
+
+────────────────────────────────────────────────
+Листинг 8 — Converters.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.db
+
+import androidx.room.TypeConverter
+import com.panfil.carlog.domain.ExpenseType
+
+class Converters {
+    @TypeConverter
+    fun fromExpenseType(value: ExpenseType): String = value.name
+
+    @TypeConverter
+    fun toExpenseType(value: String): ExpenseType = ExpenseType.valueOf(value)
+}
+
+
+────────────────────────────────────────────────
+Листинг 9 — DatabaseModule.kt (Hilt DI)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.db
+
+import android.content.Context
+import androidx.room.Room
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DatabaseModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): CarLogDatabase =
+        Room.databaseBuilder(context, CarLogDatabase::class.java, "carlog.db")
+            .fallbackToDestructiveMigration()
+            .build()
+
+    @Provides
+    fun provideExpenseDao(db: CarLogDatabase): ExpenseDao = db.expenseDao()
+
+    @Provides
+    fun provideMaintenanceDao(db: CarLogDatabase): MaintenanceDao = db.maintenanceDao()
+}
+
+
+────────────────────────────────────────────────
+Листинг 10 — ExpenseDao.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.db
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+import com.panfil.carlog.domain.Expense
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface ExpenseDao {
+    @Query("SELECT * FROM expenses ORDER BY date DESC")
+    fun getAll(): Flow<List<Expense>>
+
+    @Query("SELECT * FROM expenses WHERE date >= :startMs AND date < :endMs ORDER BY date DESC")
+    fun getByDateRange(startMs: Long, endMs: Long): Flow<List<Expense>>
+
+    @Query("SELECT SUM(amount) FROM expenses WHERE date >= :startMs AND date < :endMs")
+    fun totalInRange(startMs: Long, endMs: Long): Flow<Double?>
+
+    @Insert
+    suspend fun insert(expense: Expense): Long
+
+    @Update
+    suspend fun update(expense: Expense)
+
+    @Delete
+    suspend fun delete(expense: Expense)
+}
+
+
+────────────────────────────────────────────────
+Листинг 11 — MaintenanceDao.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.db
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
+import com.panfil.carlog.domain.Maintenance
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface MaintenanceDao {
+    @Query("SELECT * FROM maintenance ORDER BY id ASC")
+    fun getAll(): Flow<List<Maintenance>>
+
+    @Query("SELECT * FROM maintenance WHERE id = :id")
+    suspend fun getById(id: Long): Maintenance?
+
+    @Insert
+    suspend fun insert(maintenance: Maintenance): Long
+
+    @Update
+    suspend fun update(maintenance: Maintenance)
+
+    @Delete
+    suspend fun delete(maintenance: Maintenance)
+}
+
+
+────────────────────────────────────────────────
+Листинг 12 — PrefsStore.kt (DataStore)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.prefs
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.panfil.carlog.domain.CarInfo
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "carlog_prefs")
+
+@Singleton
+class PrefsStore @Inject constructor(@ApplicationContext private val context: Context) {
+
+    private object Keys {
+        val BRAND = stringPreferencesKey("car_brand")
+        val MODEL = stringPreferencesKey("car_model")
+        val GENERATION = stringPreferencesKey("car_generation")
+        val YEAR_FROM = intPreferencesKey("car_year_from")
+        val YEAR_TO = intPreferencesKey("car_year_to")
+        val MILEAGE = intPreferencesKey("car_mileage")
+        val DARK_THEME = booleanPreferencesKey("dark_theme")
+        val USE_SYSTEM_THEME = booleanPreferencesKey("use_system_theme")
+        val DISMISSED_RECOMMENDATIONS = stringSetPreferencesKey("dismissed_recommendations")
+    }
+
+    val carInfo: Flow<CarInfo> = context.dataStore.data.map { prefs ->
+        CarInfo(
+            brand = prefs[Keys.BRAND] ?: "",
+            model = prefs[Keys.MODEL] ?: "",
+            generation = prefs[Keys.GENERATION] ?: "",
+            yearFrom = prefs[Keys.YEAR_FROM] ?: 0,
+            yearTo = prefs[Keys.YEAR_TO] ?: 0,
+            mileage = prefs[Keys.MILEAGE] ?: 0,
+        )
+    }
+
+    val darkTheme: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DARK_THEME] ?: false
+    }
+
+    val useSystemTheme: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.USE_SYSTEM_THEME] ?: true
+    }
+
+    suspend fun saveCarInfo(info: CarInfo) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.BRAND] = info.brand
+            prefs[Keys.MODEL] = info.model
+            prefs[Keys.GENERATION] = info.generation
+            prefs[Keys.YEAR_FROM] = info.yearFrom
+            prefs[Keys.YEAR_TO] = info.yearTo
+            prefs[Keys.MILEAGE] = info.mileage
+        }
+    }
+
+    suspend fun setDarkTheme(dark: Boolean) {
+        context.dataStore.edit { it[Keys.DARK_THEME] = dark }
+    }
+
+    suspend fun setUseSystemTheme(use: Boolean) {
+        context.dataStore.edit { it[Keys.USE_SYSTEM_THEME] = use }
+    }
+
+    val dismissedRecommendations: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[Keys.DISMISSED_RECOMMENDATIONS] ?: emptySet()
+    }
+
+    suspend fun dismissRecommendation(title: String) {
+        context.dataStore.edit { prefs ->
+            val current = prefs[Keys.DISMISSED_RECOMMENDATIONS] ?: emptySet()
+            prefs[Keys.DISMISSED_RECOMMENDATIONS] = current + title
+        }
+    }
+
+    suspend fun clearDismissedRecommendations() {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DISMISSED_RECOMMENDATIONS] = emptySet()
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 13 — CarLogRepository.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data.repository
+
+import com.panfil.carlog.data.db.ExpenseDao
+import com.panfil.carlog.data.db.MaintenanceDao
+import com.panfil.carlog.data.prefs.PrefsStore
+import com.panfil.carlog.domain.CarInfo
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.Maintenance
+import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
+import java.time.ZoneId
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class CarLogRepository @Inject constructor(
+    private val expenseDao: ExpenseDao,
+    private val maintenanceDao: MaintenanceDao,
+    private val prefsStore: PrefsStore,
+) {
+    val allExpenses: Flow<List<Expense>> = expenseDao.getAll()
+    val allMaintenance: Flow<List<Maintenance>> = maintenanceDao.getAll()
+    val carInfo: Flow<CarInfo> = prefsStore.carInfo
+    val darkTheme: Flow<Boolean> = prefsStore.darkTheme
+    val useSystemTheme: Flow<Boolean> = prefsStore.useSystemTheme
+    val dismissedRecommendations: Flow<Set<String>> = prefsStore.dismissedRecommendations
+
+    fun expensesForMonth(year: Int, month: Int): Flow<List<Expense>> {
+        val start = LocalDate.of(year, month, 1)
+        val end = start.plusMonths(1)
+        val zone = ZoneId.systemDefault()
+        return expenseDao.getByDateRange(
+            start.atStartOfDay(zone).toInstant().toEpochMilli(),
+            end.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+    }
+
+    fun expensesForYear(year: Int): Flow<List<Expense>> {
+        val start = LocalDate.of(year, 1, 1)
+        val end = start.plusYears(1)
+        val zone = ZoneId.systemDefault()
+        return expenseDao.getByDateRange(
+            start.atStartOfDay(zone).toInstant().toEpochMilli(),
+            end.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+    }
+
+    fun monthlyTotal(year: Int, month: Int): Flow<Double?> {
+        val start = LocalDate.of(year, month, 1)
+        val end = start.plusMonths(1)
+        val zone = ZoneId.systemDefault()
+        return expenseDao.totalInRange(
+            start.atStartOfDay(zone).toInstant().toEpochMilli(),
+            end.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+    }
+
+    fun yearlyTotal(year: Int): Flow<Double?> {
+        val start = LocalDate.of(year, 1, 1)
+        val end = start.plusYears(1)
+        val zone = ZoneId.systemDefault()
+        return expenseDao.totalInRange(
+            start.atStartOfDay(zone).toInstant().toEpochMilli(),
+            end.atStartOfDay(zone).toInstant().toEpochMilli(),
+        )
+    }
+
+    fun expensesByDateRange(startMs: Long, endMs: Long): Flow<List<Expense>> =
+        expenseDao.getByDateRange(startMs, endMs)
+
+    suspend fun addExpense(expense: Expense) = expenseDao.insert(expense)
+    suspend fun updateExpense(expense: Expense) = expenseDao.update(expense)
+    suspend fun deleteExpense(expense: Expense) = expenseDao.delete(expense)
+
+    suspend fun addMaintenance(m: Maintenance) = maintenanceDao.insert(m)
+    suspend fun updateMaintenance(m: Maintenance) = maintenanceDao.update(m)
+    suspend fun deleteMaintenance(m: Maintenance) = maintenanceDao.delete(m)
+    suspend fun getMaintenanceById(id: Long) = maintenanceDao.getById(id)
+
+    suspend fun saveCarInfo(info: CarInfo) = prefsStore.saveCarInfo(info)
+    suspend fun setDarkTheme(dark: Boolean) = prefsStore.setDarkTheme(dark)
+    suspend fun setUseSystemTheme(use: Boolean) = prefsStore.setUseSystemTheme(use)
+
+    suspend fun dismissRecommendation(title: String) = prefsStore.dismissRecommendation(title)
+    suspend fun clearDismissedRecommendations() = prefsStore.clearDismissedRecommendations()
+}
+
+
+────────────────────────────────────────────────
+Листинг 14 — CarDatabase.kt (база марок/моделей)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.data
+
+import com.panfil.carlog.R
+
+data class CarGeneration(
+    val name: String,
+    val yearFrom: Int,
+    val yearTo: Int,
+)
+
+data class CarModel(
+    val name: String,
+    val generations: List<CarGeneration>,
+)
+
+data class CarBrand(
+    val name: String,
+    val logoRes: Int,
+    val models: List<CarModel>,
+)
+
+object CarDatabase {
+
+    val brands: List<CarBrand> = listOf(
+        CarBrand("Audi", R.drawable.logo_audi, listOf(
+            CarModel("A1", listOf(
+                CarGeneration("8X", 2010, 2018),
+                CarGeneration("GB", 2018, 2025),
+            )),
+            CarModel("A3", listOf(
+                CarGeneration("8L", 1996, 2003),
+                CarGeneration("8P", 2003, 2012),
+                CarGeneration("8V", 2012, 2020),
+                CarGeneration("8Y", 2020, 2025),
+            )),
+            CarModel("A4", listOf(
+                CarGeneration("B5", 1994, 2001),
+                CarGeneration("B6", 2000, 2006),
+                CarGeneration("B7", 2004, 2009),
+                CarGeneration("B8", 2007, 2015),
+                CarGeneration("B9", 2015, 2025),
+            )),
+            CarModel("A5", listOf(
+                CarGeneration("8T", 2007, 2016),
+                CarGeneration("F5", 2016, 2025),
+            )),
+            CarModel("A6", listOf(
+                CarGeneration("C4", 1994, 1997),
+                CarGeneration("C5", 1997, 2004),
+                CarGeneration("C6", 2004, 2011),
+                CarGeneration("C7", 2011, 2018),
+                CarGeneration("C8", 2018, 2025),
+            )),
+            CarModel("A7", listOf(
+                CarGeneration("4G", 2010, 2018),
+                CarGeneration("4K", 2018, 2025),
+            )),
+            CarModel("A8", listOf(
+                CarGeneration("D2", 1994, 2002),
+                CarGeneration("D3", 2002, 2010),
+                CarGeneration("D4", 2009, 2017),
+                CarGeneration("D5", 2017, 2025),
+            )),
+            CarModel("Q3", listOf(
+                CarGeneration("8U", 2011, 2018),
+                CarGeneration("F3", 2018, 2025),
+            )),
+            CarModel("Q5", listOf(
+                CarGeneration("8R", 2008, 2017),
+                CarGeneration("FY", 2016, 2025),
+            )),
+            CarModel("Q7", listOf(
+                CarGeneration("4L", 2005, 2015),
+                CarGeneration("4M", 2015, 2025),
+            )),
+            CarModel("Q8", listOf(
+                CarGeneration("4M8", 2018, 2025),
+            )),
+            CarModel("TT", listOf(
+                CarGeneration("8N", 1998, 2006),
+                CarGeneration("8J", 2006, 2014),
+                CarGeneration("8S", 2014, 2023),
+            )),
+        )),
+        CarBrand("BMW", R.drawable.logo_bmw, listOf(
+            CarModel("1 серия", listOf(
+                CarGeneration("E87", 2004, 2011),
+                CarGeneration("F20", 2011, 2019),
+                CarGeneration("F40", 2019, 2025),
+            )),
+            CarModel("2 серия", listOf(
+                CarGeneration("F22", 2013, 2021),
+                CarGeneration("G42", 2021, 2025),
+            )),
+            CarModel("3 серия", listOf(
+                CarGeneration("E36", 1990, 2000),
+                CarGeneration("E46", 1998, 2006),
+                CarGeneration("E90", 2004, 2013),
+                CarGeneration("F30", 2011, 2019),
+                CarGeneration("G20", 2018, 2025),
+            )),
+            CarModel("4 серия", listOf(
+                CarGeneration("F32", 2013, 2020),
+                CarGeneration("G22", 2020, 2025),
+            )),
+            CarModel("5 серия", listOf(
+                CarGeneration("E34", 1987, 1996),
+                CarGeneration("E39", 1995, 2004),
+                CarGeneration("E60", 2003, 2010),
+                CarGeneration("F10", 2009, 2017),
+                CarGeneration("G30", 2016, 2025),
+            )),
+            CarModel("6 серия", listOf(
+                CarGeneration("E63", 2003, 2010),
+                CarGeneration("F06", 2011, 2018),
+            )),
+            CarModel("7 серия", listOf(
+                CarGeneration("E38", 1994, 2001),
+                CarGeneration("E65", 2001, 2008),
+                CarGeneration("F01", 2008, 2015),
+                CarGeneration("G11", 2015, 2022),
+                CarGeneration("G70", 2022, 2025),
+            )),
+            CarModel("X1", listOf(
+                CarGeneration("E84", 2009, 2015),
+                CarGeneration("F48", 2015, 2022),
+                CarGeneration("U11", 2022, 2025),
+            )),
+            CarModel("X3", listOf(
+                CarGeneration("E83", 2003, 2010),
+                CarGeneration("F25", 2010, 2017),
+                CarGeneration("G01", 2017, 2025),
+            )),
+            CarModel("X4", listOf(
+                CarGeneration("F26", 2014, 2018),
+                CarGeneration("G02", 2018, 2025),
+            )),
+            CarModel("X5", listOf(
+                CarGeneration("E53", 1999, 2006),
+                CarGeneration("E70", 2006, 2013),
+                CarGeneration("F15", 2013, 2018),
+                CarGeneration("G05", 2018, 2025),
+            )),
+            CarModel("X6", listOf(
+                CarGeneration("E71", 2008, 2014),
+                CarGeneration("F16", 2014, 2019),
+                CarGeneration("G06", 2019, 2025),
+            )),
+        )),
+        CarBrand("Changan", R.drawable.logo_changan, listOf(
+            CarModel("CS35 Plus", listOf(CarGeneration("I", 2018, 2025))),
+            CarModel("CS55 Plus", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("CS75 Plus", listOf(CarGeneration("I", 2019, 2025))),
+            CarModel("Uni-K", listOf(CarGeneration("I", 2021, 2025))),
+            CarModel("Uni-V", listOf(CarGeneration("I", 2022, 2025))),
+        )),
+        CarBrand("Chery", R.drawable.logo_chery, listOf(
+            CarModel("Tiggo 4", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("Tiggo 7 Pro", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Tiggo 8 Pro", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Arrizo 8", listOf(CarGeneration("I", 2022, 2025))),
+        )),
+        CarBrand("Chevrolet", R.drawable.logo_chevrolet, listOf(
+            CarModel("Aveo", listOf(
+                CarGeneration("T200", 2002, 2008),
+                CarGeneration("T250", 2006, 2011),
+                CarGeneration("T300", 2011, 2020),
+            )),
+            CarModel("Cruze", listOf(
+                CarGeneration("I", 2008, 2015),
+                CarGeneration("II", 2015, 2020),
+            )),
+            CarModel("Cobalt", listOf(CarGeneration("I", 2011, 2020))),
+            CarModel("Lacetti", listOf(CarGeneration("I", 2002, 2013))),
+            CarModel("Niva", listOf(CarGeneration("I", 2002, 2025))),
+            CarModel("Captiva", listOf(
+                CarGeneration("I (C100)", 2006, 2011),
+                CarGeneration("I рест. (C140)", 2011, 2018),
+            )),
+            CarModel("Orlando", listOf(CarGeneration("I", 2010, 2018))),
+            CarModel("Spark", listOf(
+                CarGeneration("II (M200)", 2005, 2010),
+                CarGeneration("III (M300)", 2009, 2016),
+            )),
+            CarModel("Tahoe", listOf(
+                CarGeneration("III (GMT900)", 2006, 2014),
+                CarGeneration("IV (K2UG)", 2014, 2020),
+                CarGeneration("V", 2020, 2025),
+            )),
+            CarModel("Camaro", listOf(
+                CarGeneration("V", 2009, 2015),
+                CarGeneration("VI", 2015, 2024),
+            )),
+        )),
+        CarBrand("Citroën", R.drawable.logo_citroen, listOf(
+            CarModel("C3", listOf(
+                CarGeneration("I", 2002, 2009),
+                CarGeneration("II", 2009, 2016),
+                CarGeneration("III", 2016, 2025),
+            )),
+            CarModel("C4", listOf(
+                CarGeneration("I", 2004, 2010),
+                CarGeneration("II", 2010, 2018),
+                CarGeneration("III", 2020, 2025),
+            )),
+            CarModel("C5", listOf(
+                CarGeneration("I", 2001, 2008),
+                CarGeneration("II", 2007, 2017),
+                CarGeneration("X", 2021, 2025),
+            )),
+            CarModel("C-Crosser", listOf(CarGeneration("I", 2007, 2013))),
+            CarModel("C4 Aircross", listOf(CarGeneration("I", 2012, 2017))),
+            CarModel("Berlingo", listOf(
+                CarGeneration("II", 2008, 2018),
+                CarGeneration("III", 2018, 2025),
+            )),
+        )),
+        CarBrand("Daewoo", R.drawable.logo_daewoo, listOf(
+            CarModel("Matiz", listOf(CarGeneration("I", 1998, 2015))),
+            CarModel("Nexia", listOf(
+                CarGeneration("I", 1994, 2008),
+                CarGeneration("II", 2008, 2016),
+            )),
+            CarModel("Gentra", listOf(CarGeneration("I", 2005, 2011))),
+            CarModel("Lanos", listOf(CarGeneration("I", 1997, 2009))),
+        )),
+        CarBrand("Fiat", R.drawable.logo_fiat, listOf(
+            CarModel("500", listOf(
+                CarGeneration("I", 2007, 2020),
+                CarGeneration("500e", 2020, 2025),
+            )),
+            CarModel("Punto", listOf(
+                CarGeneration("II", 1999, 2007),
+                CarGeneration("III", 2005, 2018),
+            )),
+            CarModel("Ducato", listOf(
+                CarGeneration("III", 2006, 2014),
+                CarGeneration("III рест.", 2014, 2025),
+            )),
+            CarModel("Albea", listOf(CarGeneration("I", 2002, 2012))),
+        )),
+        CarBrand("Ford", R.drawable.logo_ford, listOf(
+            CarModel("EcoSport", listOf(
+                CarGeneration("I", 2003, 2012),
+                CarGeneration("II", 2012, 2022),
+            )),
+            CarModel("Explorer", listOf(
+                CarGeneration("IV", 2005, 2010),
+                CarGeneration("V", 2010, 2019),
+                CarGeneration("VI", 2019, 2025),
+            )),
+            CarModel("Fiesta", listOf(
+                CarGeneration("V", 2001, 2008),
+                CarGeneration("VI", 2008, 2017),
+                CarGeneration("VII", 2017, 2023),
+            )),
+            CarModel("Focus", listOf(
+                CarGeneration("I", 1998, 2005),
+                CarGeneration("II", 2004, 2011),
+                CarGeneration("III", 2010, 2018),
+                CarGeneration("IV", 2018, 2025),
+            )),
+            CarModel("Fusion", listOf(CarGeneration("I", 2002, 2012))),
+            CarModel("Galaxy", listOf(
+                CarGeneration("II", 2006, 2015),
+                CarGeneration("III", 2015, 2022),
+            )),
+            CarModel("Kuga", listOf(
+                CarGeneration("I", 2008, 2012),
+                CarGeneration("II", 2012, 2019),
+                CarGeneration("III", 2019, 2025),
+            )),
+            CarModel("Mondeo", listOf(
+                CarGeneration("III", 2000, 2007),
+                CarGeneration("IV", 2007, 2014),
+                CarGeneration("V", 2014, 2022),
+            )),
+            CarModel("Ranger", listOf(
+                CarGeneration("III (T6)", 2011, 2022),
+                CarGeneration("IV (P703)", 2022, 2025),
+            )),
+            CarModel("S-MAX", listOf(
+                CarGeneration("I", 2006, 2015),
+                CarGeneration("II", 2015, 2023),
+            )),
+            CarModel("Transit", listOf(
+                CarGeneration("VI", 2006, 2013),
+                CarGeneration("VII", 2013, 2025),
+            )),
+        )),
+        CarBrand("Geely", R.drawable.logo_geely, listOf(
+            CarModel("Atlas", listOf(CarGeneration("I", 2016, 2025))),
+            CarModel("Atlas Pro", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Coolray", listOf(CarGeneration("I", 2019, 2025))),
+            CarModel("Monjaro", listOf(CarGeneration("I", 2022, 2025))),
+            CarModel("Emgrand", listOf(
+                CarGeneration("EC7", 2009, 2018),
+                CarGeneration("IV", 2021, 2025),
+            )),
+            CarModel("Tugella", listOf(CarGeneration("I", 2020, 2025))),
+        )),
+        CarBrand("Haval", R.drawable.logo_haval, listOf(
+            CarModel("F7", listOf(CarGeneration("I", 2018, 2025))),
+            CarModel("F7x", listOf(CarGeneration("I", 2019, 2025))),
+            CarModel("H6", listOf(CarGeneration("III", 2020, 2025))),
+            CarModel("H9", listOf(CarGeneration("I", 2014, 2025))),
+            CarModel("Jolion", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Dargo", listOf(CarGeneration("I", 2021, 2025))),
+        )),
+        CarBrand("Honda", R.drawable.logo_honda, listOf(
+            CarModel("Accord", listOf(
+                CarGeneration("VII", 2002, 2008),
+                CarGeneration("VIII", 2007, 2013),
+                CarGeneration("IX", 2012, 2017),
+                CarGeneration("X", 2017, 2025),
+            )),
+            CarModel("Civic", listOf(
+                CarGeneration("VII", 2000, 2006),
+                CarGeneration("VIII", 2005, 2012),
+                CarGeneration("IX", 2011, 2016),
+                CarGeneration("X", 2015, 2021),
+                CarGeneration("XI", 2021, 2025),
+            )),
+            CarModel("CR-V", listOf(
+                CarGeneration("I", 1995, 2001),
+                CarGeneration("II", 2001, 2006),
+                CarGeneration("III", 2006, 2012),
+                CarGeneration("IV", 2011, 2018),
+                CarGeneration("V", 2016, 2025),
+            )),
+            CarModel("Fit / Jazz", listOf(
+                CarGeneration("I (GD)", 2001, 2008),
+                CarGeneration("II (GE)", 2007, 2013),
+                CarGeneration("III (GK)", 2013, 2020),
+                CarGeneration("IV (GR)", 2020, 2025),
+            )),
+            CarModel("HR-V", listOf(
+                CarGeneration("I (GH)", 1998, 2006),
+                CarGeneration("II (RU)", 2013, 2021),
+                CarGeneration("III", 2021, 2025),
+            )),
+            CarModel("Pilot", listOf(
+                CarGeneration("I", 2002, 2008),
+                CarGeneration("II", 2008, 2015),
+                CarGeneration("III", 2015, 2025),
+            )),
+        )),
+        CarBrand("Hyundai", R.drawable.logo_hyundai, listOf(
+            CarModel("Accent", listOf(
+                CarGeneration("II (LC)", 1999, 2005),
+                CarGeneration("III (MC)", 2005, 2010),
+                CarGeneration("IV (RB)", 2010, 2017),
+                CarGeneration("V (HC)", 2017, 2025),
+            )),
+            CarModel("Creta", listOf(
+                CarGeneration("I", 2015, 2021),
+                CarGeneration("II", 2021, 2025),
+            )),
+            CarModel("Elantra", listOf(
+                CarGeneration("IV (HD)", 2006, 2011),
+                CarGeneration("V (MD)", 2010, 2016),
+                CarGeneration("VI (AD)", 2015, 2020),
+                CarGeneration("VII (CN7)", 2020, 2025),
+            )),
+            CarModel("Getz", listOf(CarGeneration("I", 2002, 2011))),
+            CarModel("i30", listOf(
+                CarGeneration("I (FD)", 2007, 2012),
+                CarGeneration("II (GD)", 2011, 2017),
+                CarGeneration("III (PD)", 2016, 2025),
+            )),
+            CarModel("ix35", listOf(CarGeneration("I (LM)", 2009, 2015))),
+            CarModel("Palisade", listOf(CarGeneration("I (LX2)", 2018, 2025))),
+            CarModel("Santa Fe", listOf(
+                CarGeneration("I (SM)", 2000, 2006),
+                CarGeneration("II (CM)", 2006, 2012),
+                CarGeneration("III (DM)", 2012, 2018),
+                CarGeneration("IV (TM)", 2018, 2025),
+            )),
+            CarModel("Solaris", listOf(
+                CarGeneration("I", 2010, 2017),
+                CarGeneration("II", 2017, 2025),
+            )),
+            CarModel("Sonata", listOf(
+                CarGeneration("V (NF)", 2004, 2010),
+                CarGeneration("VI (YF)", 2009, 2014),
+                CarGeneration("VII (LF)", 2014, 2019),
+                CarGeneration("VIII (DN8)", 2019, 2025),
+            )),
+            CarModel("Tucson", listOf(
+                CarGeneration("I (JM)", 2004, 2010),
+                CarGeneration("II (LM)", 2009, 2015),
+                CarGeneration("III (TL)", 2015, 2020),
+                CarGeneration("IV (NX4)", 2020, 2025),
+            )),
+        )),
+        CarBrand("Infiniti", R.drawable.logo_infiniti, listOf(
+            CarModel("FX / QX70", listOf(
+                CarGeneration("FX35/45 (S50)", 2002, 2008),
+                CarGeneration("FX35/50 (S51)", 2008, 2017),
+            )),
+            CarModel("G / Q50", listOf(
+                CarGeneration("G35 (V35)", 2002, 2007),
+                CarGeneration("G37 (V36)", 2006, 2013),
+                CarGeneration("Q50 (V37)", 2013, 2025),
+            )),
+            CarModel("QX50", listOf(
+                CarGeneration("I (J50)", 2007, 2017),
+                CarGeneration("II (QX50)", 2018, 2025),
+            )),
+            CarModel("QX60", listOf(
+                CarGeneration("I (L50)", 2012, 2020),
+                CarGeneration("II (L51)", 2021, 2025),
+            )),
+            CarModel("QX80", listOf(
+                CarGeneration("I (Z62)", 2010, 2025),
+            )),
+        )),
+        CarBrand("Jeep", R.drawable.logo_jeep, listOf(
+            CarModel("Cherokee", listOf(
+                CarGeneration("XJ", 1984, 2001),
+                CarGeneration("KL", 2013, 2023),
+            )),
+            CarModel("Grand Cherokee", listOf(
+                CarGeneration("WJ", 1998, 2004),
+                CarGeneration("WK", 2004, 2010),
+                CarGeneration("WK2", 2010, 2021),
+                CarGeneration("WL", 2021, 2025),
+            )),
+            CarModel("Compass", listOf(
+                CarGeneration("I (MK49)", 2006, 2016),
+                CarGeneration("II (MP)", 2016, 2025),
+            )),
+            CarModel("Wrangler", listOf(
+                CarGeneration("TJ", 1996, 2006),
+                CarGeneration("JK", 2006, 2018),
+                CarGeneration("JL", 2017, 2025),
+            )),
+        )),
+        CarBrand("Kia", R.drawable.logo_kia, listOf(
+            CarModel("Carnival", listOf(
+                CarGeneration("II (VQ)", 2006, 2014),
+                CarGeneration("III (KA4)", 2014, 2020),
+                CarGeneration("IV", 2020, 2025),
+            )),
+            CarModel("Ceed", listOf(
+                CarGeneration("I (ED)", 2006, 2012),
+                CarGeneration("II (JD)", 2012, 2018),
+                CarGeneration("III (CD)", 2018, 2025),
+            )),
+            CarModel("Cerato", listOf(
+                CarGeneration("I (LD)", 2003, 2008),
+                CarGeneration("II (TD)", 2008, 2013),
+                CarGeneration("III (YD)", 2013, 2018),
+                CarGeneration("IV (BD)", 2018, 2025),
+            )),
+            CarModel("Mohave", listOf(
+                CarGeneration("I (HM)", 2008, 2019),
+                CarGeneration("II", 2019, 2025),
+            )),
+            CarModel("Optima / K5", listOf(
+                CarGeneration("III (MG)", 2010, 2015),
+                CarGeneration("IV (JF)", 2015, 2020),
+                CarGeneration("V (DL3)", 2019, 2025),
+            )),
+            CarModel("Picanto", listOf(
+                CarGeneration("I (SA)", 2004, 2011),
+                CarGeneration("II (TA)", 2011, 2017),
+                CarGeneration("III (JA)", 2017, 2025),
+            )),
+            CarModel("Rio", listOf(
+                CarGeneration("I (DC)", 2000, 2005),
+                CarGeneration("II (JB)", 2005, 2011),
+                CarGeneration("III (UB)", 2011, 2017),
+                CarGeneration("IV (FB)", 2017, 2025),
+            )),
+            CarModel("Seltos", listOf(CarGeneration("I", 2019, 2025))),
+            CarModel("Sorento", listOf(
+                CarGeneration("I (BL)", 2002, 2009),
+                CarGeneration("II (XM)", 2009, 2014),
+                CarGeneration("III (UM)", 2014, 2020),
+                CarGeneration("IV (MQ4)", 2020, 2025),
+            )),
+            CarModel("Soul", listOf(
+                CarGeneration("I (AM)", 2008, 2013),
+                CarGeneration("II (PS)", 2013, 2019),
+                CarGeneration("III (SK3)", 2019, 2025),
+            )),
+            CarModel("Sportage", listOf(
+                CarGeneration("I", 1993, 2004),
+                CarGeneration("II (KM)", 2004, 2010),
+                CarGeneration("III (SL)", 2010, 2015),
+                CarGeneration("IV (QL)", 2015, 2021),
+                CarGeneration("V (NQ5)", 2021, 2025),
+            )),
+            CarModel("Stinger", listOf(CarGeneration("I (CK)", 2017, 2023))),
+        )),
+        CarBrand("Lada (ВАЗ)", R.drawable.logo_lada, listOf(
+            CarModel("2107", listOf(CarGeneration("I", 1982, 2012))),
+            CarModel("2110", listOf(CarGeneration("I", 1996, 2007))),
+            CarModel("2114", listOf(CarGeneration("I", 2001, 2013))),
+            CarModel("Granta", listOf(
+                CarGeneration("I", 2011, 2018),
+                CarGeneration("I рестайлинг", 2018, 2025),
+            )),
+            CarModel("Kalina", listOf(
+                CarGeneration("I", 2004, 2013),
+                CarGeneration("II", 2013, 2018),
+            )),
+            CarModel("Largus", listOf(
+                CarGeneration("I", 2012, 2021),
+                CarGeneration("I рестайлинг", 2021, 2025),
+            )),
+            CarModel("Niva (4x4)", listOf(CarGeneration("2121", 1977, 2025))),
+            CarModel("Niva Travel", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Priora", listOf(CarGeneration("I", 2007, 2018))),
+            CarModel("Vesta", listOf(
+                CarGeneration("I", 2015, 2022),
+                CarGeneration("II (NG)", 2022, 2025),
+            )),
+            CarModel("XRAY", listOf(CarGeneration("I", 2015, 2022))),
+        )),
+        CarBrand("Land Rover", R.drawable.logo_landrover, listOf(
+            CarModel("Defender", listOf(
+                CarGeneration("I", 1983, 2016),
+                CarGeneration("II (L663)", 2019, 2025),
+            )),
+            CarModel("Discovery", listOf(
+                CarGeneration("III (L319)", 2004, 2009),
+                CarGeneration("IV (L319)", 2009, 2016),
+                CarGeneration("V (L462)", 2016, 2025),
+            )),
+            CarModel("Discovery Sport", listOf(CarGeneration("I (L550)", 2014, 2025))),
+            CarModel("Freelander", listOf(
+                CarGeneration("I", 1997, 2006),
+                CarGeneration("II (L359)", 2006, 2014),
+            )),
+            CarModel("Range Rover", listOf(
+                CarGeneration("III (L322)", 2002, 2012),
+                CarGeneration("IV (L405)", 2012, 2021),
+                CarGeneration("V (L460)", 2021, 2025),
+            )),
+            CarModel("Range Rover Evoque", listOf(
+                CarGeneration("I (L538)", 2011, 2019),
+                CarGeneration("II (L551)", 2018, 2025),
+            )),
+            CarModel("Range Rover Sport", listOf(
+                CarGeneration("I (L320)", 2005, 2013),
+                CarGeneration("II (L494)", 2013, 2022),
+                CarGeneration("III (L461)", 2022, 2025),
+            )),
+        )),
+        CarBrand("Lexus", R.drawable.logo_lexus, listOf(
+            CarModel("ES", listOf(
+                CarGeneration("V (XV30)", 2001, 2006),
+                CarGeneration("VI (XV40)", 2006, 2012),
+                CarGeneration("VII (XV60)", 2012, 2018),
+                CarGeneration("VIII (XZ10)", 2018, 2025),
+            )),
+            CarModel("GX", listOf(
+                CarGeneration("I (J120)", 2002, 2009),
+                CarGeneration("II (J150)", 2009, 2025),
+            )),
+            CarModel("IS", listOf(
+                CarGeneration("I (XE10)", 1998, 2005),
+                CarGeneration("II (XE20)", 2005, 2013),
+                CarGeneration("III (XE30)", 2013, 2025),
+            )),
+            CarModel("LX", listOf(
+                CarGeneration("II (UZJ100)", 1998, 2007),
+                CarGeneration("III (URJ200)", 2007, 2021),
+                CarGeneration("IV (VJA310)", 2021, 2025),
+            )),
+            CarModel("NX", listOf(
+                CarGeneration("I (AZ10)", 2014, 2021),
+                CarGeneration("II (AZ20)", 2021, 2025),
+            )),
+            CarModel("RX", listOf(
+                CarGeneration("I (XU10)", 1998, 2003),
+                CarGeneration("II (XU30)", 2003, 2008),
+                CarGeneration("III (AL10)", 2008, 2015),
+                CarGeneration("IV (AL20)", 2015, 2022),
+                CarGeneration("V (AL30)", 2022, 2025),
+            )),
+        )),
+        CarBrand("Mazda", R.drawable.logo_mazda, listOf(
+            CarModel("2 / Demio", listOf(
+                CarGeneration("II (DY)", 2002, 2007),
+                CarGeneration("III (DE)", 2007, 2014),
+                CarGeneration("IV (DJ)", 2014, 2025),
+            )),
+            CarModel("3", listOf(
+                CarGeneration("BK", 2003, 2009),
+                CarGeneration("BL", 2009, 2013),
+                CarGeneration("BM", 2013, 2019),
+                CarGeneration("BP", 2019, 2025),
+            )),
+            CarModel("5", listOf(
+                CarGeneration("I (CR)", 2005, 2010),
+                CarGeneration("II (CW)", 2010, 2018),
+            )),
+            CarModel("6", listOf(
+                CarGeneration("GG", 2002, 2008),
+                CarGeneration("GH", 2007, 2012),
+                CarGeneration("GJ", 2012, 2025),
+            )),
+            CarModel("CX-3", listOf(CarGeneration("DK", 2015, 2025))),
+            CarModel("CX-5", listOf(
+                CarGeneration("KE", 2011, 2017),
+                CarGeneration("KF", 2016, 2025),
+            )),
+            CarModel("CX-7", listOf(CarGeneration("ER", 2006, 2012))),
+            CarModel("CX-9", listOf(
+                CarGeneration("I (TB)", 2006, 2015),
+                CarGeneration("II (TC)", 2015, 2025),
+            )),
+            CarModel("MX-5", listOf(
+                CarGeneration("NB", 1998, 2005),
+                CarGeneration("NC", 2005, 2015),
+                CarGeneration("ND", 2015, 2025),
+            )),
+        )),
+        CarBrand("Mercedes-Benz", R.drawable.logo_mercedes, listOf(
+            CarModel("A-класс", listOf(
+                CarGeneration("W168", 1997, 2004),
+                CarGeneration("W169", 2004, 2012),
+                CarGeneration("W176", 2012, 2018),
+                CarGeneration("W177", 2018, 2025),
+            )),
+            CarModel("B-класс", listOf(
+                CarGeneration("W245", 2005, 2011),
+                CarGeneration("W246", 2011, 2018),
+                CarGeneration("W247", 2018, 2025),
+            )),
+            CarModel("C-класс", listOf(
+                CarGeneration("W202", 1993, 2001),
+                CarGeneration("W203", 2000, 2007),
+                CarGeneration("W204", 2007, 2014),
+                CarGeneration("W205", 2014, 2021),
+                CarGeneration("W206", 2021, 2025),
+            )),
+            CarModel("CLA", listOf(
+                CarGeneration("C117", 2013, 2019),
+                CarGeneration("C118", 2019, 2025),
+            )),
+            CarModel("E-класс", listOf(
+                CarGeneration("W210", 1995, 2003),
+                CarGeneration("W211", 2002, 2009),
+                CarGeneration("W212", 2009, 2016),
+                CarGeneration("W213", 2016, 2023),
+                CarGeneration("W214", 2023, 2025),
+            )),
+            CarModel("GLA", listOf(
+                CarGeneration("X156", 2013, 2019),
+                CarGeneration("H247", 2019, 2025),
+            )),
+            CarModel("GLB", listOf(CarGeneration("X247", 2019, 2025))),
+            CarModel("GLC", listOf(
+                CarGeneration("X253", 2015, 2022),
+                CarGeneration("X254", 2022, 2025),
+            )),
+            CarModel("GLE", listOf(
+                CarGeneration("W166", 2015, 2019),
+                CarGeneration("V167", 2018, 2025),
+            )),
+            CarModel("GLS", listOf(
+                CarGeneration("X166", 2015, 2019),
+                CarGeneration("X167", 2019, 2025),
+            )),
+            CarModel("S-класс", listOf(
+                CarGeneration("W140", 1991, 1998),
+                CarGeneration("W220", 1998, 2005),
+                CarGeneration("W221", 2005, 2013),
+                CarGeneration("W222", 2013, 2020),
+                CarGeneration("W223", 2020, 2025),
+            )),
+            CarModel("Vito / V-класс", listOf(
+                CarGeneration("W639", 2003, 2014),
+                CarGeneration("W447", 2014, 2025),
+            )),
+        )),
+        CarBrand("Mitsubishi", R.drawable.logo_mitsubishi, listOf(
+            CarModel("ASX", listOf(CarGeneration("I", 2010, 2023))),
+            CarModel("Eclipse Cross", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("L200", listOf(
+                CarGeneration("IV", 2005, 2015),
+                CarGeneration("V", 2015, 2025),
+            )),
+            CarModel("Lancer", listOf(
+                CarGeneration("IX", 2003, 2010),
+                CarGeneration("X", 2007, 2017),
+            )),
+            CarModel("Outlander", listOf(
+                CarGeneration("I (CU)", 2001, 2008),
+                CarGeneration("II (CW)", 2006, 2012),
+                CarGeneration("III (GF)", 2012, 2021),
+                CarGeneration("IV", 2021, 2025),
+            )),
+            CarModel("Pajero", listOf(
+                CarGeneration("III", 1999, 2006),
+                CarGeneration("IV", 2006, 2021),
+            )),
+            CarModel("Pajero Sport", listOf(
+                CarGeneration("II", 2008, 2016),
+                CarGeneration("III", 2015, 2025),
+            )),
+        )),
+        CarBrand("Nissan", R.drawable.logo_nissan, listOf(
+            CarModel("Almera", listOf(
+                CarGeneration("N15", 1995, 2000),
+                CarGeneration("N16", 2000, 2006),
+                CarGeneration("G15", 2012, 2018),
+            )),
+            CarModel("Juke", listOf(
+                CarGeneration("I (F15)", 2010, 2019),
+                CarGeneration("II (F16)", 2019, 2025),
+            )),
+            CarModel("Murano", listOf(
+                CarGeneration("I (Z50)", 2002, 2008),
+                CarGeneration("II (Z51)", 2007, 2014),
+                CarGeneration("III (Z52)", 2014, 2025),
+            )),
+            CarModel("Note", listOf(
+                CarGeneration("I (E11)", 2004, 2013),
+                CarGeneration("II (E12)", 2012, 2020),
+                CarGeneration("III (E13)", 2020, 2025),
+            )),
+            CarModel("Pathfinder", listOf(
+                CarGeneration("III (R51)", 2004, 2013),
+                CarGeneration("IV (R52)", 2012, 2021),
+                CarGeneration("V (R53)", 2021, 2025),
+            )),
+            CarModel("Qashqai", listOf(
+                CarGeneration("I (J10)", 2006, 2013),
+                CarGeneration("II (J11)", 2013, 2021),
+                CarGeneration("III (J12)", 2021, 2025),
+            )),
+            CarModel("Teana", listOf(
+                CarGeneration("I (J31)", 2003, 2008),
+                CarGeneration("II (J32)", 2008, 2014),
+                CarGeneration("III (L33)", 2014, 2020),
+            )),
+            CarModel("Tiida", listOf(
+                CarGeneration("I (C11)", 2004, 2012),
+                CarGeneration("II (C13)", 2011, 2018),
+            )),
+            CarModel("X-Trail", listOf(
+                CarGeneration("I (T30)", 2000, 2007),
+                CarGeneration("II (T31)", 2007, 2013),
+                CarGeneration("III (T32)", 2013, 2021),
+                CarGeneration("IV (T33)", 2021, 2025),
+            )),
+        )),
+        CarBrand("Opel", R.drawable.logo_opel, listOf(
+            CarModel("Astra", listOf(
+                CarGeneration("G", 1998, 2005),
+                CarGeneration("H", 2004, 2014),
+                CarGeneration("J", 2009, 2015),
+                CarGeneration("K", 2015, 2022),
+            )),
+            CarModel("Corsa", listOf(
+                CarGeneration("C", 2000, 2006),
+                CarGeneration("D", 2006, 2014),
+                CarGeneration("E", 2014, 2019),
+                CarGeneration("F", 2019, 2025),
+            )),
+            CarModel("Insignia", listOf(
+                CarGeneration("I", 2008, 2017),
+                CarGeneration("II", 2017, 2022),
+            )),
+            CarModel("Meriva", listOf(
+                CarGeneration("A", 2003, 2010),
+                CarGeneration("B", 2010, 2017),
+            )),
+            CarModel("Mokka", listOf(
+                CarGeneration("I", 2012, 2020),
+                CarGeneration("II", 2020, 2025),
+            )),
+            CarModel("Zafira", listOf(
+                CarGeneration("A", 1999, 2005),
+                CarGeneration("B", 2005, 2014),
+                CarGeneration("C Tourer", 2011, 2019),
+            )),
+        )),
+        CarBrand("Peugeot", R.drawable.logo_peugeot, listOf(
+            CarModel("206", listOf(CarGeneration("I", 1998, 2012))),
+            CarModel("207", listOf(CarGeneration("I", 2006, 2014))),
+            CarModel("208", listOf(
+                CarGeneration("I", 2012, 2019),
+                CarGeneration("II", 2019, 2025),
+            )),
+            CarModel("301", listOf(CarGeneration("I", 2012, 2021))),
+            CarModel("308", listOf(
+                CarGeneration("I (T7)", 2007, 2015),
+                CarGeneration("II (T9)", 2013, 2021),
+                CarGeneration("III (P5)", 2021, 2025),
+            )),
+            CarModel("408", listOf(
+                CarGeneration("I", 2010, 2017),
+                CarGeneration("II", 2022, 2025),
+            )),
+            CarModel("508", listOf(
+                CarGeneration("I", 2010, 2018),
+                CarGeneration("II", 2018, 2025),
+            )),
+            CarModel("2008", listOf(
+                CarGeneration("I", 2013, 2019),
+                CarGeneration("II", 2019, 2025),
+            )),
+            CarModel("3008", listOf(
+                CarGeneration("I", 2009, 2016),
+                CarGeneration("II", 2016, 2025),
+            )),
+            CarModel("5008", listOf(
+                CarGeneration("I", 2009, 2017),
+                CarGeneration("II", 2017, 2025),
+            )),
+        )),
+        CarBrand("Porsche", R.drawable.logo_porsche, listOf(
+            CarModel("Cayenne", listOf(
+                CarGeneration("I (955)", 2002, 2010),
+                CarGeneration("II (958)", 2010, 2018),
+                CarGeneration("III (9YA)", 2017, 2025),
+            )),
+            CarModel("Macan", listOf(
+                CarGeneration("I (95B)", 2013, 2025),
+            )),
+            CarModel("Panamera", listOf(
+                CarGeneration("I (970)", 2009, 2016),
+                CarGeneration("II (971)", 2016, 2025),
+            )),
+            CarModel("911", listOf(
+                CarGeneration("996", 1997, 2005),
+                CarGeneration("997", 2004, 2012),
+                CarGeneration("991", 2011, 2019),
+                CarGeneration("992", 2018, 2025),
+            )),
+        )),
+        CarBrand("Renault", R.drawable.logo_renault, listOf(
+            CarModel("Arkana", listOf(CarGeneration("I", 2019, 2025))),
+            CarModel("Captur", listOf(
+                CarGeneration("I", 2013, 2019),
+                CarGeneration("II", 2019, 2025),
+            )),
+            CarModel("Duster", listOf(
+                CarGeneration("I", 2010, 2017),
+                CarGeneration("I рестайлинг", 2015, 2020),
+                CarGeneration("II", 2020, 2025),
+            )),
+            CarModel("Fluence", listOf(CarGeneration("I", 2009, 2017))),
+            CarModel("Kaptur", listOf(
+                CarGeneration("I", 2016, 2020),
+                CarGeneration("I рестайлинг", 2020, 2025),
+            )),
+            CarModel("Koleos", listOf(
+                CarGeneration("I", 2007, 2016),
+                CarGeneration("II", 2016, 2025),
+            )),
+            CarModel("Logan", listOf(
+                CarGeneration("I", 2004, 2012),
+                CarGeneration("II", 2012, 2020),
+            )),
+            CarModel("Megane", listOf(
+                CarGeneration("II", 2002, 2009),
+                CarGeneration("III", 2008, 2016),
+                CarGeneration("IV", 2015, 2023),
+            )),
+            CarModel("Sandero", listOf(
+                CarGeneration("I", 2007, 2014),
+                CarGeneration("II", 2012, 2020),
+            )),
+            CarModel("Scenic", listOf(
+                CarGeneration("II", 2003, 2009),
+                CarGeneration("III", 2009, 2016),
+                CarGeneration("IV", 2016, 2022),
+            )),
+        )),
+        CarBrand("Skoda", R.drawable.logo_skoda, listOf(
+            CarModel("Fabia", listOf(
+                CarGeneration("I (6Y)", 1999, 2007),
+                CarGeneration("II (5J)", 2007, 2014),
+                CarGeneration("III (NJ)", 2014, 2021),
+                CarGeneration("IV (PJ)", 2021, 2025),
+            )),
+            CarModel("Karoq", listOf(CarGeneration("I (NU)", 2017, 2025))),
+            CarModel("Kodiaq", listOf(CarGeneration("I (NS)", 2016, 2025))),
+            CarModel("Octavia", listOf(
+                CarGeneration("I (1U)", 1996, 2010),
+                CarGeneration("II (1Z)", 2004, 2013),
+                CarGeneration("III (5E)", 2012, 2020),
+                CarGeneration("IV (NX)", 2019, 2025),
+            )),
+            CarModel("Rapid", listOf(
+                CarGeneration("I (NH)", 2012, 2019),
+                CarGeneration("II (NK)", 2020, 2025),
+            )),
+            CarModel("Superb", listOf(
+                CarGeneration("I (3U)", 2001, 2008),
+                CarGeneration("II (3T)", 2008, 2015),
+                CarGeneration("III (3V)", 2015, 2025),
+            )),
+            CarModel("Yeti", listOf(CarGeneration("I (5L)", 2009, 2018))),
+        )),
+        CarBrand("Subaru", R.drawable.logo_subaru, listOf(
+            CarModel("Forester", listOf(
+                CarGeneration("I (SF)", 1997, 2002),
+                CarGeneration("II (SG)", 2002, 2008),
+                CarGeneration("III (SH)", 2007, 2013),
+                CarGeneration("IV (SJ)", 2012, 2018),
+                CarGeneration("V (SK)", 2018, 2025),
+            )),
+            CarModel("Impreza", listOf(
+                CarGeneration("II (GD)", 2000, 2007),
+                CarGeneration("III (GE)", 2007, 2011),
+                CarGeneration("IV (GJ)", 2011, 2016),
+                CarGeneration("V (GT)", 2016, 2023),
+            )),
+            CarModel("Legacy", listOf(
+                CarGeneration("IV (BL)", 2003, 2009),
+                CarGeneration("V (BM)", 2009, 2014),
+                CarGeneration("VI (BN)", 2014, 2020),
+                CarGeneration("VII (BW)", 2019, 2025),
+            )),
+            CarModel("Outback", listOf(
+                CarGeneration("III (BP)", 2003, 2009),
+                CarGeneration("IV (BR)", 2009, 2014),
+                CarGeneration("V (BS)", 2014, 2020),
+                CarGeneration("VI (BT)", 2019, 2025),
+            )),
+            CarModel("XV / Crosstrek", listOf(
+                CarGeneration("I (GP)", 2011, 2017),
+                CarGeneration("II (GT)", 2017, 2025),
+            )),
+            CarModel("WRX", listOf(
+                CarGeneration("I (VA)", 2014, 2021),
+                CarGeneration("II (VB)", 2021, 2025),
+            )),
+        )),
+        CarBrand("Suzuki", R.drawable.logo_suzuki, listOf(
+            CarModel("Grand Vitara", listOf(
+                CarGeneration("II (JT)", 2005, 2015),
+                CarGeneration("III", 2015, 2025),
+            )),
+            CarModel("Jimny", listOf(
+                CarGeneration("III (JB43)", 1998, 2018),
+                CarGeneration("IV (JB64)", 2018, 2025),
+            )),
+            CarModel("SX4", listOf(
+                CarGeneration("I", 2006, 2014),
+                CarGeneration("II (S-Cross)", 2013, 2025),
+            )),
+            CarModel("Swift", listOf(
+                CarGeneration("III", 2004, 2010),
+                CarGeneration("IV", 2010, 2017),
+                CarGeneration("V", 2017, 2025),
+            )),
+            CarModel("Vitara", listOf(
+                CarGeneration("IV (LY)", 2014, 2025),
+            )),
+        )),
+        CarBrand("Toyota", R.drawable.logo_toyota, listOf(
+            CarModel("Alphard", listOf(
+                CarGeneration("I (H10)", 2002, 2008),
+                CarGeneration("II (H20)", 2008, 2015),
+                CarGeneration("III (H30)", 2015, 2025),
+            )),
+            CarModel("Avensis", listOf(
+                CarGeneration("II (T250)", 2003, 2008),
+                CarGeneration("III (T270)", 2008, 2018),
+            )),
+            CarModel("Camry", listOf(
+                CarGeneration("XV30", 2001, 2006),
+                CarGeneration("XV40", 2006, 2011),
+                CarGeneration("XV50", 2011, 2017),
+                CarGeneration("XV70", 2017, 2025),
+            )),
+            CarModel("C-HR", listOf(CarGeneration("I", 2016, 2025))),
+            CarModel("Corolla", listOf(
+                CarGeneration("E120", 2000, 2007),
+                CarGeneration("E140", 2006, 2013),
+                CarGeneration("E160", 2012, 2019),
+                CarGeneration("E210", 2018, 2025),
+            )),
+            CarModel("Fortuner", listOf(
+                CarGeneration("I (AN50)", 2004, 2015),
+                CarGeneration("II (AN160)", 2015, 2025),
+            )),
+            CarModel("Highlander", listOf(
+                CarGeneration("I (U20)", 2000, 2007),
+                CarGeneration("II (U40)", 2007, 2013),
+                CarGeneration("III (U50)", 2013, 2019),
+                CarGeneration("IV (U60)", 2019, 2025),
+            )),
+            CarModel("Hilux", listOf(
+                CarGeneration("VII (AN10)", 2004, 2015),
+                CarGeneration("VIII (AN120)", 2015, 2025),
+            )),
+            CarModel("Land Cruiser 200", listOf(CarGeneration("200", 2007, 2021))),
+            CarModel("Land Cruiser 300", listOf(CarGeneration("300", 2021, 2025))),
+            CarModel("Land Cruiser Prado", listOf(
+                CarGeneration("120", 2002, 2009),
+                CarGeneration("150", 2009, 2025),
+            )),
+            CarModel("RAV4", listOf(
+                CarGeneration("II (XA20)", 2000, 2005),
+                CarGeneration("III (XA30)", 2005, 2012),
+                CarGeneration("IV (XA40)", 2012, 2019),
+                CarGeneration("V (XA50)", 2018, 2025),
+            )),
+            CarModel("Yaris", listOf(
+                CarGeneration("I (P1)", 1999, 2005),
+                CarGeneration("II (P9)", 2005, 2011),
+                CarGeneration("III (P13)", 2011, 2020),
+                CarGeneration("IV", 2020, 2025),
+            )),
+        )),
+        CarBrand("Volkswagen", R.drawable.logo_vw, listOf(
+            CarModel("Amarok", listOf(
+                CarGeneration("I", 2010, 2022),
+                CarGeneration("II", 2022, 2025),
+            )),
+            CarModel("Arteon", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("Caddy", listOf(
+                CarGeneration("III", 2004, 2015),
+                CarGeneration("IV", 2015, 2020),
+                CarGeneration("V", 2020, 2025),
+            )),
+            CarModel("Golf", listOf(
+                CarGeneration("IV", 1997, 2006),
+                CarGeneration("V", 2003, 2009),
+                CarGeneration("VI", 2008, 2013),
+                CarGeneration("VII", 2012, 2020),
+                CarGeneration("VIII", 2019, 2025),
+            )),
+            CarModel("ID.4", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Jetta", listOf(
+                CarGeneration("V", 2005, 2011),
+                CarGeneration("VI", 2010, 2018),
+                CarGeneration("VII", 2018, 2025),
+            )),
+            CarModel("Passat", listOf(
+                CarGeneration("B5", 1996, 2005),
+                CarGeneration("B6", 2005, 2010),
+                CarGeneration("B7", 2010, 2014),
+                CarGeneration("B8", 2014, 2023),
+                CarGeneration("B9", 2023, 2025),
+            )),
+            CarModel("Polo", listOf(
+                CarGeneration("IV (9N)", 2001, 2009),
+                CarGeneration("V (6R)", 2009, 2017),
+                CarGeneration("VI", 2017, 2025),
+            )),
+            CarModel("T-Cross", listOf(CarGeneration("I", 2018, 2025))),
+            CarModel("T-Roc", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("Taos", listOf(CarGeneration("I", 2020, 2025))),
+            CarModel("Tiguan", listOf(
+                CarGeneration("I (5N)", 2007, 2016),
+                CarGeneration("II (AD)", 2016, 2025),
+            )),
+            CarModel("Touareg", listOf(
+                CarGeneration("I (7L)", 2002, 2010),
+                CarGeneration("II (7P)", 2010, 2018),
+                CarGeneration("III (CR)", 2018, 2025),
+            )),
+            CarModel("Transporter", listOf(
+                CarGeneration("T5", 2003, 2015),
+                CarGeneration("T6", 2015, 2025),
+            )),
+        )),
+        CarBrand("Volvo", R.drawable.logo_volvo, listOf(
+            CarModel("S40", listOf(CarGeneration("II", 2004, 2012))),
+            CarModel("S60", listOf(
+                CarGeneration("I", 2000, 2009),
+                CarGeneration("II", 2010, 2018),
+                CarGeneration("III", 2018, 2025),
+            )),
+            CarModel("S80", listOf(
+                CarGeneration("I", 1998, 2006),
+                CarGeneration("II", 2006, 2016),
+            )),
+            CarModel("S90", listOf(CarGeneration("II", 2016, 2025))),
+            CarModel("V40", listOf(CarGeneration("II", 2012, 2019))),
+            CarModel("V60", listOf(
+                CarGeneration("I", 2010, 2018),
+                CarGeneration("II", 2018, 2025),
+            )),
+            CarModel("V90", listOf(CarGeneration("II", 2016, 2025))),
+            CarModel("XC40", listOf(CarGeneration("I", 2017, 2025))),
+            CarModel("XC60", listOf(
+                CarGeneration("I", 2008, 2017),
+                CarGeneration("II", 2017, 2025),
+            )),
+            CarModel("XC90", listOf(
+                CarGeneration("I", 2002, 2014),
+                CarGeneration("II", 2014, 2025),
+            )),
+        )),
+    )
+
+    fun brandNames(): List<String> = brands.map { it.name }
+
+    fun modelsFor(brandName: String): List<CarModel> =
+        brands.firstOrNull { it.name == brandName }?.models ?: emptyList()
+
+    fun generationsFor(brandName: String, modelName: String): List<CarGeneration> =
+        modelsFor(brandName).firstOrNull { it.name == modelName }?.generations ?: emptyList()
+
+    fun logoFor(brandName: String): Int =
+        brands.firstOrNull { it.name == brandName }?.logoRes ?: R.drawable.logo_default
+
+}
+
+
+────────────────────────────────────────────────
+Листинг 15 — MaintenanceWorker.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.notifications
+
+import android.Manifest
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.hilt.work.HiltWorker
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
+import com.panfil.carlog.CarLogApp
+import com.panfil.carlog.MainActivity
+import com.panfil.carlog.R
+import com.panfil.carlog.data.db.MaintenanceDao
+import com.panfil.carlog.data.prefs.PrefsStore
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import kotlinx.coroutines.flow.first
+
+@HiltWorker
+class MaintenanceWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+    private val maintenanceDao: MaintenanceDao,
+    private val prefsStore: PrefsStore,
+) : CoroutineWorker(context, params) {
+
+    override suspend fun doWork(): Result {
+        val carInfo = prefsStore.carInfo.first()
+        val items = maintenanceDao.getAll().first()
+        val currentMileage = carInfo.mileage
+        val now = System.currentTimeMillis()
+
+        items.filter { it.notifyEnabled }.forEach { m ->
+            val mileageDue = m.lastMileage + m.mileageInterval
+            val dateDue = m.lastDate + m.monthsInterval.toLong() * 30 * 24 * 60 * 60 * 1000
+
+            val mileageSoon = m.mileageInterval > 0 && currentMileage >= mileageDue - 1000
+            val dateSoon = m.monthsInterval > 0 && now >= dateDue - 7L * 24 * 60 * 60 * 1000
+
+            if (mileageSoon || dateSoon) {
+                sendNotification(m.id.toInt(), m.title, currentMileage, mileageDue)
+            }
+        }
+        return Result.success()
+    }
+
+    private fun sendNotification(id: Int, title: String, current: Int, due: Int) {
+        if (ContextCompat.checkSelfPermission(
+                applicationContext, Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        ) return
+
+        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pending = PendingIntent.getActivity(
+            applicationContext, id, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+
+        val text = if (due > 0) {
+            "Пробег: $current км. Следующее ТО при $due км"
+        } else {
+            "Подходит срок техобслуживания"
+        }
+
+        val notification = NotificationCompat.Builder(applicationContext, CarLogApp.CHANNEL_MAINTENANCE)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("ТО: $title")
+            .setContentText(text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+
+        NotificationManagerCompat.from(applicationContext).notify(id, notification)
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 16 — NotificationScheduler.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.notifications
+
+import android.content.Context
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class NotificationScheduler @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    fun scheduleMaintenanceCheck() {
+        val request = PeriodicWorkRequestBuilder<MaintenanceWorker>(1, TimeUnit.DAYS)
+            .setInitialDelay(1, TimeUnit.HOURS)
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    fun cancelMaintenanceCheck() {
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+    }
+
+    companion object {
+        private const val WORK_NAME = "maintenance_check"
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 17 — Theme.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.theme
+
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+
+private val Purple = Color(0xFF6C5CE7)
+private val PurpleLight = Color(0xFF9B8FEF)
+private val PurpleDark = Color(0xFF4A3DB8)
+private val Teal = Color(0xFF00BFA5)
+private val TealDark = Color(0xFF26A69A)
+
+private val LightColors = lightColorScheme(
+    primary = Purple,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFEDE7FF),
+    onPrimaryContainer = Color(0xFF1D0060),
+    secondary = Teal,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFB2DFDB),
+    onSecondaryContainer = Color(0xFF00332C),
+    background = Color(0xFFF8F6FF),
+    onBackground = Color(0xFF1C1B1F),
+    surface = Color.White,
+    onSurface = Color(0xFF1C1B1F),
+    surfaceVariant = Color(0xFFF0EDFA),
+    onSurfaceVariant = Color(0xFF49454F),
+    outline = Color(0xFF79747E),
+    error = Color(0xFFE53935),
+    onError = Color.White,
+)
+
+private val DarkColors = darkColorScheme(
+    primary = PurpleLight,
+    onPrimary = Color(0xFF1D0060),
+    primaryContainer = PurpleDark,
+    onPrimaryContainer = Color(0xFFEDE7FF),
+    secondary = TealDark,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFF004D40),
+    onSecondaryContainer = Color(0xFFB2DFDB),
+    background = Color(0xFF121212),
+    onBackground = Color(0xFFE6E1E5),
+    surface = Color(0xFF1E1E1E),
+    onSurface = Color(0xFFE6E1E5),
+    surfaceVariant = Color(0xFF2D2D30),
+    onSurfaceVariant = Color(0xFFCAC4D0),
+    outline = Color(0xFF938F99),
+    error = Color(0xFFEF5350),
+    onError = Color.White,
+)
+
+@Composable
+fun CarLogTheme(
+    darkTheme: Boolean = isSystemInDarkTheme(),
+    content: @Composable () -> Unit,
+) {
+    val colorScheme = if (darkTheme) DarkColors else LightColors
+    MaterialTheme(colorScheme = colorScheme, content = content)
+}
+
+
+────────────────────────────────────────────────
+Листинг 18 — AppRoot.kt (навигация)
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.navigation
+
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Receipt
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import com.panfil.carlog.R
+import com.panfil.carlog.ui.screens.analytics.AnalyticsScreen
+import com.panfil.carlog.ui.screens.expenses.ExpensesScreen
+import com.panfil.carlog.ui.screens.home.HomeScreen
+import com.panfil.carlog.ui.screens.maintenance.MaintenanceScreen
+
+object Routes {
+    const val HOME = "home"
+    const val EXPENSES = "expenses"
+    const val ANALYTICS = "analytics"
+    const val MAINTENANCE = "maintenance"
+}
+
+private data class Tab(
+    val route: String,
+    val labelRes: Int,
+    val icon: ImageVector,
+)
+
+private val Tabs = listOf(
+    Tab(Routes.HOME, R.string.tab_home, Icons.Default.Home),
+    Tab(Routes.EXPENSES, R.string.tab_expenses, Icons.Default.Receipt),
+    Tab(Routes.ANALYTICS, R.string.tab_analytics, Icons.Default.Analytics),
+    Tab(Routes.MAINTENANCE, R.string.tab_maintenance, Icons.Default.Build),
+)
+
+@Composable
+fun AppRoot() {
+    val navController = rememberNavController()
+    val backStack by navController.currentBackStackEntryAsState()
+    val current = backStack?.destination?.route
+
+    Scaffold(
+        bottomBar = {
+            NavigationBar {
+                Tabs.forEach { tab ->
+                    NavigationBarItem(
+                        selected = current == tab.route,
+                        onClick = {
+                            navController.navigate(tab.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(tab.icon, contentDescription = null) },
+                        label = { Text(stringResource(tab.labelRes)) },
+                    )
+                }
+            }
+        },
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = Routes.HOME,
+            modifier = Modifier.padding(padding),
+        ) {
+            composable(Routes.HOME) { HomeScreen() }
+            composable(Routes.EXPENSES) { ExpensesScreen() }
+            composable(Routes.ANALYTICS) { AnalyticsScreen() }
+            composable(Routes.MAINTENANCE) { MaintenanceScreen() }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 19 — HomeViewModel.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.panfil.carlog.data.repository.CarLogRepository
+import com.panfil.carlog.domain.CarInfo
+import com.panfil.carlog.domain.Maintenance
+import com.panfil.carlog.notifications.NotificationScheduler
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import javax.inject.Inject
+
+data class HomeUiState(
+    val carInfo: CarInfo = CarInfo(),
+    val monthlyTotal: Double = 0.0,
+    val nextMaintenance: List<MaintenanceStatus> = emptyList(),
+    val showEditDialog: Boolean = false,
+    val showAddExpenseDialog: Boolean = false,
+    val useSystemTheme: Boolean = true,
+    val darkTheme: Boolean = false,
+)
+
+data class MaintenanceStatus(
+    val maintenance: Maintenance,
+    val dueMileage: Int,
+    val dueDate: Long,
+    val isOverdue: Boolean,
+)
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val repository: CarLogRepository,
+    private val notificationScheduler: NotificationScheduler,
+) : ViewModel() {
+
+    private val _showEdit = MutableStateFlow(false)
+    private val _showAddExpense = MutableStateFlow(false)
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        repository.carInfo,
+        repository.monthlyTotal(LocalDate.now().year, LocalDate.now().monthValue),
+        repository.allMaintenance,
+        _showEdit,
+        _showAddExpense,
+        repository.useSystemTheme,
+        repository.darkTheme,
+    ) { values ->
+        val carInfo = values[0] as CarInfo
+        val monthly = (values[1] as? Double) ?: 0.0
+        @Suppress("UNCHECKED_CAST")
+        val maintenanceList = values[2] as List<Maintenance>
+        val showEdit = values[3] as Boolean
+        val showAddExp = values[4] as Boolean
+        val useSys = values[5] as Boolean
+        val dark = values[6] as Boolean
+
+        val now = System.currentTimeMillis()
+        val statuses = maintenanceList.map { m ->
+            val dueMileage = m.lastMileage + m.mileageInterval
+            val dueDate = m.lastDate + m.monthsInterval.toLong() * 30 * 24 * 60 * 60 * 1000
+            val overdueMileage = m.mileageInterval > 0 && carInfo.mileage >= dueMileage
+            val overdueDate = m.monthsInterval > 0 && now >= dueDate
+            MaintenanceStatus(m, dueMileage, dueDate, overdueMileage || overdueDate)
+        }
+
+        HomeUiState(
+            carInfo = carInfo,
+            monthlyTotal = monthly,
+            nextMaintenance = statuses,
+            showEditDialog = showEdit,
+            showAddExpenseDialog = showAddExp,
+            useSystemTheme = useSys,
+            darkTheme = dark,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HomeUiState())
+
+    init {
+        notificationScheduler.scheduleMaintenanceCheck()
+    }
+
+    fun showEditDialog() { _showEdit.value = true }
+    fun hideEditDialog() { _showEdit.value = false }
+    fun showAddExpenseDialog() { _showAddExpense.value = true }
+    fun hideAddExpenseDialog() { _showAddExpense.value = false }
+
+    fun saveCarInfo(info: CarInfo) {
+        viewModelScope.launch {
+            repository.saveCarInfo(info)
+            _showEdit.value = false
+        }
+    }
+
+    fun setDarkTheme(dark: Boolean) {
+        viewModelScope.launch { repository.setDarkTheme(dark) }
+    }
+
+    fun setUseSystemTheme(use: Boolean) {
+        viewModelScope.launch { repository.setUseSystemTheme(use) }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 20 — ExpensesViewModel.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.expenses
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.panfil.carlog.data.repository.CarLogRepository
+import com.panfil.carlog.domain.CarInfo
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.FilterPeriod
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import javax.inject.Inject
+
+data class ExpensesUiState(
+    val expenses: List<Expense> = emptyList(),
+    val showAddDialog: Boolean = false,
+    val filterPeriod: FilterPeriod = FilterPeriod.ALL,
+    val customStart: LocalDate? = null,
+    val customEnd: LocalDate? = null,
+    val total: Double = 0.0,
+    val periodLabel: String = "Все",
+    val carInfo: CarInfo = CarInfo(),
+    val showStartPicker: Boolean = false,
+    val showEndPicker: Boolean = false,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class ExpensesViewModel @Inject constructor(
+    private val repository: CarLogRepository,
+) : ViewModel() {
+
+    private val _showAdd = MutableStateFlow(false)
+    private val _filterPeriod = MutableStateFlow(FilterPeriod.ALL)
+    private val _customStart = MutableStateFlow<LocalDate?>(null)
+    private val _customEnd = MutableStateFlow<LocalDate?>(null)
+    private val _showStartPicker = MutableStateFlow(false)
+    private val _showEndPicker = MutableStateFlow(false)
+
+    private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+    private val zone = ZoneId.systemDefault()
+
+    private val filteredExpenses = combine(
+        _filterPeriod, _customStart, _customEnd,
+    ) { period, cStart, cEnd ->
+        val now = LocalDate.now()
+        when (period) {
+            FilterPeriod.ALL -> null to null
+            FilterPeriod.WEEK -> (now.minusWeeks(1)) to now.plusDays(1)
+            FilterPeriod.MONTH -> (now.minusMonths(1)) to now.plusDays(1)
+            FilterPeriod.QUARTER -> (now.minusMonths(3)) to now.plusDays(1)
+            FilterPeriod.YEAR -> (now.minusYears(1)) to now.plusDays(1)
+            FilterPeriod.CUSTOM -> (cStart ?: now.minusMonths(1)) to (cEnd?.plusDays(1) ?: now.plusDays(1))
+        }
+    }.flatMapLatest { (start, end) ->
+        if (start == null || end == null) {
+            repository.allExpenses
+        } else {
+            val startMs = start.atStartOfDay(zone).toInstant().toEpochMilli()
+            val endMs = end.atStartOfDay(zone).toInstant().toEpochMilli()
+            repository.expensesByDateRange(startMs, endMs)
+        }
+    }
+
+    val uiState: StateFlow<ExpensesUiState> = combine(
+        filteredExpenses,
+        _showAdd,
+        _filterPeriod,
+        _customStart,
+        _customEnd,
+    ) { expenses, showAdd, period, cStart, cEnd ->
+        val total = expenses.sumOf { it.amount }
+        val label = buildPeriodLabel(period, cStart, cEnd)
+        ExpensesUiState(
+            expenses = expenses,
+            showAddDialog = showAdd,
+            filterPeriod = period,
+            customStart = cStart,
+            customEnd = cEnd,
+            total = total,
+            periodLabel = label,
+        )
+    }.combine(combine(_showStartPicker, _showEndPicker, repository.carInfo) { sp, ep, car ->
+        Triple(sp, ep, car)
+    }) { state, (sp, ep, car) ->
+        state.copy(showStartPicker = sp, showEndPicker = ep, carInfo = car)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ExpensesUiState())
+
+    fun showAddDialog() { _showAdd.value = true }
+    fun hideAddDialog() { _showAdd.value = false }
+
+    fun setFilterPeriod(period: FilterPeriod) {
+        _filterPeriod.value = period
+    }
+
+    fun setCustomStart(date: LocalDate) { _customStart.value = date }
+    fun setCustomEnd(date: LocalDate) { _customEnd.value = date }
+    fun showStartPicker() { _showStartPicker.value = true }
+    fun hideStartPicker() { _showStartPicker.value = false }
+    fun showEndPicker() { _showEndPicker.value = true }
+    fun hideEndPicker() { _showEndPicker.value = false }
+
+    fun addExpense(expense: Expense) {
+        viewModelScope.launch {
+            repository.addExpense(expense)
+            _showAdd.value = false
+        }
+    }
+
+    fun deleteExpense(expense: Expense) {
+        viewModelScope.launch { repository.deleteExpense(expense) }
+    }
+
+    private fun buildPeriodLabel(period: FilterPeriod, start: LocalDate?, end: LocalDate?): String {
+        val now = LocalDate.now()
+        return when (period) {
+            FilterPeriod.ALL -> "Все время"
+            FilterPeriod.WEEK -> "${now.minusWeeks(1).format(dateFormatter)} — ${now.format(dateFormatter)}"
+            FilterPeriod.MONTH -> "${now.minusMonths(1).format(dateFormatter)} — ${now.format(dateFormatter)}"
+            FilterPeriod.QUARTER -> "${now.minusMonths(3).format(dateFormatter)} — ${now.format(dateFormatter)}"
+            FilterPeriod.YEAR -> "${now.minusYears(1).format(dateFormatter)} — ${now.format(dateFormatter)}"
+            FilterPeriod.CUSTOM -> {
+                val s = start?.format(dateFormatter) ?: "..."
+                val e = end?.format(dateFormatter) ?: "..."
+                "$s — $e"
+            }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 21 — AnalyticsViewModel.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.analytics
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.panfil.carlog.data.repository.CarLogRepository
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.ExpenseType
+import com.panfil.carlog.domain.MaintenanceRecommendation
+import com.panfil.carlog.domain.RecommendationProvider
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import javax.inject.Inject
+
+data class AnalyticsUiState(
+    val monthlyTotal: Double = 0.0,
+    val yearlyTotal: Double = 0.0,
+    val byType: Map<ExpenseType, Double> = emptyMap(),
+    val monthlyExpenses: List<Expense> = emptyList(),
+    val recommendation: String = "",
+    val recommendations: List<MaintenanceRecommendation> = emptyList(),
+    val hasMileage: Boolean = false,
+    val hasDismissed: Boolean = false,
+)
+
+@HiltViewModel
+class AnalyticsViewModel @Inject constructor(
+    private val repository: CarLogRepository,
+) : ViewModel() {
+
+    private val now = LocalDate.now()
+
+    val uiState: StateFlow<AnalyticsUiState> = combine(
+        repository.monthlyTotal(now.year, now.monthValue),
+        repository.yearlyTotal(now.year),
+        repository.expensesForYear(now.year),
+        combine(repository.carInfo, repository.allMaintenance, repository.dismissedRecommendations) { a, b, c ->
+            Triple(a, b, c)
+        },
+    ) { monthly, yearly, yearExpenses, (carInfo, maintenanceItems, dismissed) ->
+        val m = monthly ?: 0.0
+        val y = yearly ?: 0.0
+
+        val byType = yearExpenses
+            .groupBy { it.type }
+            .mapValues { (_, list) -> list.sumOf { it.amount } }
+            .toSortedMap(compareByDescending { byType -> byType.ordinal })
+
+        val recommendation = when {
+            y == 0.0 -> "Добавьте расходы для получения рекомендаций"
+            m > y / 12 * 1.5 -> "Расходы за месяц выше среднего — проверьте необходимость трат"
+            else -> "Все расходы в норме"
+        }
+
+        val allRecommendations = RecommendationProvider.generate(
+            currentMileage = carInfo.mileage,
+            existingMaintenance = maintenanceItems,
+        )
+
+        val visibleRecommendations = allRecommendations.filter { it.title !in dismissed }
+
+        AnalyticsUiState(
+            monthlyTotal = m,
+            yearlyTotal = y,
+            byType = byType,
+            monthlyExpenses = yearExpenses,
+            recommendation = recommendation,
+            recommendations = visibleRecommendations,
+            hasMileage = carInfo.mileage > 0,
+            hasDismissed = dismissed.isNotEmpty(),
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AnalyticsUiState())
+
+    fun dismissRecommendation(title: String) {
+        viewModelScope.launch { repository.dismissRecommendation(title) }
+    }
+
+    fun dismissAllRecommendations() {
+        val current = uiState.value.recommendations
+        viewModelScope.launch {
+            current.forEach { repository.dismissRecommendation(it.title) }
+        }
+    }
+
+    fun restoreRecommendations() {
+        viewModelScope.launch { repository.clearDismissedRecommendations() }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 22 — MaintenanceViewModel.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.maintenance
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.panfil.carlog.data.repository.CarLogRepository
+import com.panfil.carlog.domain.CarInfo
+import com.panfil.carlog.domain.Maintenance
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+data class MaintenanceUiState(
+    val items: List<Maintenance> = emptyList(),
+    val carInfo: CarInfo = CarInfo(),
+    val showAddDialog: Boolean = false,
+)
+
+@HiltViewModel
+class MaintenanceViewModel @Inject constructor(
+    private val repository: CarLogRepository,
+) : ViewModel() {
+
+    private val _showAdd = MutableStateFlow(false)
+
+    val uiState: StateFlow<MaintenanceUiState> = combine(
+        repository.allMaintenance,
+        repository.carInfo,
+        _showAdd,
+    ) { items, carInfo, showAdd ->
+        MaintenanceUiState(items = items, carInfo = carInfo, showAddDialog = showAdd)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MaintenanceUiState())
+
+    fun showAddDialog() { _showAdd.value = true }
+    fun hideAddDialog() { _showAdd.value = false }
+
+    fun addMaintenance(m: Maintenance) {
+        viewModelScope.launch {
+            repository.addMaintenance(m)
+            _showAdd.value = false
+        }
+    }
+
+    fun deleteMaintenance(m: Maintenance) {
+        viewModelScope.launch { repository.deleteMaintenance(m) }
+    }
+
+    fun toggleNotification(m: Maintenance) {
+        viewModelScope.launch {
+            repository.updateMaintenance(m.copy(notifyEnabled = !m.notifyEnabled))
+        }
+    }
+
+    fun markDone(m: Maintenance, currentMileage: Int) {
+        viewModelScope.launch {
+            repository.updateMaintenance(
+                m.copy(
+                    lastMileage = currentMileage,
+                    lastDate = System.currentTimeMillis(),
+                ),
+            )
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 23 — HomeScreen.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.home
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.panfil.carlog.R
+import com.panfil.carlog.data.CarDatabase
+import com.panfil.carlog.ui.components.EditCarDialog
+import java.text.NumberFormat
+import java.util.Locale
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(viewModel: HomeViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = {
+                Text(
+                    stringResource(R.string.app_name),
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+            actions = {
+                IconButton(onClick = {
+                    if (state.useSystemTheme) {
+                        viewModel.setUseSystemTheme(false)
+                        viewModel.setDarkTheme(!state.darkTheme)
+                    } else {
+                        viewModel.setDarkTheme(!state.darkTheme)
+                    }
+                }) {
+                    Icon(
+                        if (state.darkTheme && !state.useSystemTheme) Icons.Default.LightMode
+                        else Icons.Default.DarkMode,
+                        contentDescription = stringResource(R.string.toggle_theme),
+                    )
+                }
+            },
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // Car Info Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.DirectionsCar,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.car_info_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (state.carInfo.brand.isNotEmpty()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = painterResource(CarDatabase.logoFor(state.carInfo.brand)),
+                                contentDescription = state.carInfo.brand,
+                                modifier = Modifier
+                                    .size(56.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                            )
+                            Spacer(Modifier.width(16.dp))
+                            Column {
+                                val genInfo = if (state.carInfo.generation.isNotEmpty()) {
+                                    " ${state.carInfo.generation}"
+                                } else ""
+                                Text(
+                                    "${state.carInfo.brand} ${state.carInfo.model}$genInfo",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                )
+                                if (state.carInfo.yearFrom > 0) {
+                                    Text(
+                                        "${state.carInfo.yearFrom}–${state.carInfo.yearTo}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    )
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Speed,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        stringResource(R.string.current_mileage, state.carInfo.mileage),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            stringResource(R.string.no_car_info),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    FilledTonalButton(
+                        onClick = { viewModel.showEditDialog() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.edit_car))
+                    }
+                }
+            }
+
+            // Next Maintenance Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            Icons.Default.Build,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.next_maintenance),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    if (state.nextMaintenance.isEmpty()) {
+                        Text(
+                            stringResource(R.string.no_upcoming_maintenance),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        state.nextMaintenance.forEach { status ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (status.isOverdue)
+                                        MaterialTheme.colorScheme.errorContainer
+                                    else MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (status.isOverdue) {
+                                            Icon(
+                                                Icons.Default.Warning,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(18.dp),
+                                                tint = MaterialTheme.colorScheme.error,
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                        }
+                                        Text(
+                                            status.maintenance.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Medium,
+                                        )
+                                    }
+                                    Text(
+                                        if (status.isOverdue) stringResource(R.string.overdue)
+                                        else stringResource(R.string.at_mileage, status.dueMileage),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (status.isOverdue) MaterialTheme.colorScheme.error
+                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Monthly Expenses Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ),
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "💰",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.expenses_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        currencyFormat.format(state.monthlyTotal),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                    Text(
+                        stringResource(R.string.monthly_expenses, ""),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    )
+                }
+            }
+        }
+    }
+
+    if (state.showEditDialog) {
+        EditCarDialog(
+            initial = state.carInfo,
+            onDismiss = { viewModel.hideEditDialog() },
+            onSave = { viewModel.saveCarInfo(it) },
+        )
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 24 — ExpensesScreen.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.expenses
+
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.panfil.carlog.R
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.FilterPeriod
+import com.panfil.carlog.ui.components.AddExpenseDialog
+import com.panfil.carlog.util.PdfReportGenerator
+import java.text.NumberFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(R.string.tab_expenses),
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                actions = {
+                    if (state.expenses.isNotEmpty()) {
+                        IconButton(onClick = {
+                            PdfReportGenerator.generateAndShare(
+                                context = context,
+                                expenses = state.expenses,
+                                carInfo = state.carInfo,
+                                periodLabel = state.periodLabel,
+                            )
+                        }) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = stringResource(R.string.export_pdf),
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.showAddDialog() },
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_expense))
+            }
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+        ) {
+            // Filter chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterPeriod.entries.forEach { period ->
+                    FilterChip(
+                        selected = state.filterPeriod == period,
+                        onClick = { viewModel.setFilterPeriod(period) },
+                        label = { Text(period.label) },
+                    )
+                }
+            }
+
+            // Custom date range
+            if (state.filterPeriod == FilterPeriod.CUSTOM) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    OutlinedButton(
+                        onClick = { viewModel.showStartPicker() },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            state.customStart?.format(dateFormatter)
+                                ?: stringResource(R.string.filter_from),
+                        )
+                    }
+                    Text("—")
+                    OutlinedButton(
+                        onClick = { viewModel.showEndPicker() },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(
+                            state.customEnd?.format(dateFormatter)
+                                ?: stringResource(R.string.filter_to),
+                        )
+                    }
+                }
+            }
+
+            // Total
+            if (state.filterPeriod != FilterPeriod.ALL && state.expenses.isNotEmpty()) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(
+                                R.string.total_for_period,
+                                currencyFormat.format(state.total),
+                            ),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        IconButton(onClick = {
+                            PdfReportGenerator.generateAndShare(
+                                context = context,
+                                expenses = state.expenses,
+                                carInfo = state.carInfo,
+                                periodLabel = state.periodLabel,
+                            )
+                        }) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = stringResource(R.string.export_pdf),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Expense list
+            if (state.expenses.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Text(
+                        if (state.filterPeriod != FilterPeriod.ALL)
+                            stringResource(R.string.no_expenses_for_period)
+                        else
+                            stringResource(R.string.no_expenses),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
+                ) {
+                    items(state.expenses, key = { it.id }) { expense ->
+                        ExpenseItem(expense = expense, onDelete = { viewModel.deleteExpense(expense) })
+                    }
+                }
+            }
+        }
+    }
+
+    if (state.showAddDialog) {
+        AddExpenseDialog(
+            onDismiss = { viewModel.hideAddDialog() },
+            onSave = { viewModel.addExpense(it) },
+        )
+    }
+
+    if (state.showStartPicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.customStart
+                ?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { viewModel.hideStartPicker() },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        val date = Instant.ofEpochMilli(ms)
+                            .atZone(ZoneOffset.UTC).toLocalDate()
+                        viewModel.setCustomStart(date)
+                    }
+                    viewModel.hideStartPicker()
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hideStartPicker() }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+
+    if (state.showEndPicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = state.customEnd
+                ?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { viewModel.hideEndPicker() },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let { ms ->
+                        val date = Instant.ofEpochMilli(ms)
+                            .atZone(ZoneOffset.UTC).toLocalDate()
+                        viewModel.setCustomEnd(date)
+                    }
+                    viewModel.hideEndPicker()
+                }) { Text(stringResource(R.string.save)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.hideEndPicker() }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+}
+
+@Composable
+private fun ExpenseItem(expense: Expense, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    expense.type.label,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Spacer(Modifier.height(4.dp))
+                val dateStr = Instant.ofEpochMilli(expense.date)
+                    .atZone(ZoneId.systemDefault())
+                    .format(dateFormatter)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        dateStr,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (expense.mileage > 0) {
+                        Text(
+                            "${expense.mileage} км",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (expense.description.isNotEmpty()) {
+                    Text(
+                        expense.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    currencyFormat.format(expense.amount),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Default.Delete,
+                        contentDescription = stringResource(R.string.delete),
+                        tint = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 25 — AnalyticsScreen.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.analytics
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Restore
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.panfil.carlog.R
+import com.panfil.carlog.domain.MaintenanceRecommendation
+import com.panfil.carlog.domain.RecommendationStatus
+import java.text.NumberFormat
+import java.util.Locale
+
+private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
+private val numberFormat = NumberFormat.getNumberInstance(Locale("ru", "RU"))
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AnalyticsScreen(viewModel: AnalyticsViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(
+            title = {
+                Text(
+                    stringResource(R.string.tab_analytics),
+                    fontWeight = FontWeight.Bold,
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                titleContentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // Total expenses card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(R.string.total_expenses),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.monthly_label, currencyFormat.format(state.monthlyTotal)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        stringResource(R.string.yearly_label, currencyFormat.format(state.yearlyTotal)),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            // Expenses by type card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(R.string.expenses_by_type),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (state.byType.isEmpty()) {
+                        Text(
+                            stringResource(R.string.no_data),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        val maxAmount = state.byType.values.maxOrNull() ?: 1.0
+                        state.byType.forEach { (type, amount) ->
+                            Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        type.label,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                    )
+                                    Text(
+                                        currencyFormat.format(amount),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                                LinearProgressIndicator(
+                                    progress = { (amount / maxAmount).toFloat() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(8.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Spending analysis card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(R.string.recommendations),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        state.recommendation,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+
+            // Maintenance recommendations
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        stringResource(R.string.recommendations_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    if (!state.hasMileage) {
+                        Text(
+                            stringResource(R.string.rec_no_data),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else if (state.recommendations.isEmpty()) {
+                        Text(
+                            "Все рекомендации выполнены",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        state.recommendations.forEach { rec ->
+                            RecommendationItem(
+                                rec = rec,
+                                onDismiss = { viewModel.dismissRecommendation(rec.title) },
+                            )
+                            Spacer(Modifier.height(8.dp))
+                        }
+
+                        FilledTonalButton(
+                            onClick = { viewModel.dismissAllRecommendations() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                Icons.Default.DeleteSweep,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Убрать все рекомендации")
+                        }
+                    }
+
+                    if (state.hasDismissed) {
+                        Spacer(Modifier.height(4.dp))
+                        OutlinedButton(
+                            onClick = { viewModel.restoreRecommendations() },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Icon(
+                                Icons.Default.Restore,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Восстановить рекомендации")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RecommendationItem(
+    rec: MaintenanceRecommendation,
+    onDismiss: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val (icon, color, statusLabel) = when (rec.status) {
+        RecommendationStatus.OVERDUE -> Triple(
+            Icons.Default.Warning,
+            MaterialTheme.colorScheme.error,
+            "Просрочено",
+        )
+        RecommendationStatus.UPCOMING -> Triple(
+            Icons.Default.Info,
+            MaterialTheme.colorScheme.tertiary,
+            "Скоро",
+        )
+        RecommendationStatus.OK -> Triple(
+            Icons.Default.CheckCircle,
+            MaterialTheme.colorScheme.primary,
+            "В норме",
+        )
+    }
+
+    val containerColor = when (rec.status) {
+        RecommendationStatus.OVERDUE -> MaterialTheme.colorScheme.errorContainer
+        RecommendationStatus.UPCOMING -> MaterialTheme.colorScheme.tertiaryContainer
+        RecommendationStatus.OK -> MaterialTheme.colorScheme.surfaceVariant
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column {
+            // Header row — clickable to expand
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        rec.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        statusLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = color,
+                    )
+                }
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+                IconButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Убрать",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            // Expandable details
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 60.dp, end = 12.dp, bottom = 12.dp),
+                ) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        color = color.copy(alpha = 0.3f),
+                    )
+                    Text(
+                        "Зачем:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        rec.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Когда делать:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        buildString {
+                            append("Каждые ${numberFormat.format(rec.mileageInterval)} км")
+                            if (rec.monthsInterval > 0) {
+                                append(" или каждые ${rec.monthsInterval} мес.")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    if (rec.status == RecommendationStatus.OVERDUE) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.1f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                        ) {
+                            Text(
+                                "⚠ Просрочено на ${numberFormat.format(rec.overdueByKm)} км!",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    } else {
+                        Text(
+                            "Следующее при ${numberFormat.format(rec.nextDueMileage)} км",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 26 — MaintenanceScreen.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.screens.maintenance
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.panfil.carlog.R
+import com.panfil.carlog.domain.Maintenance
+import com.panfil.carlog.ui.components.AddMaintenanceDialog
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MaintenanceScreen(viewModel: MaintenanceViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        stringResource(R.string.tab_maintenance),
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { viewModel.showAddDialog() },
+                containerColor = MaterialTheme.colorScheme.secondary,
+                contentColor = MaterialTheme.colorScheme.onSecondary,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_maintenance))
+            }
+        },
+    ) { padding ->
+        if (state.items.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Text(
+                    stringResource(R.string.no_upcoming_maintenance),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
+            ) {
+                items(state.items, key = { it.id }) { item ->
+                    MaintenanceItem(
+                        item = item,
+                        currentMileage = state.carInfo.mileage,
+                        onToggleNotify = { viewModel.toggleNotification(item) },
+                        onMarkDone = { viewModel.markDone(item, state.carInfo.mileage) },
+                        onDelete = { viewModel.deleteMaintenance(item) },
+                    )
+                }
+            }
+        }
+    }
+
+    if (state.showAddDialog) {
+        AddMaintenanceDialog(
+            onDismiss = { viewModel.hideAddDialog() },
+            onSave = { viewModel.addMaintenance(it) },
+        )
+    }
+}
+
+@Composable
+private fun MaintenanceItem(
+    item: Maintenance,
+    currentMileage: Int,
+    onToggleNotify: () -> Unit,
+    onMarkDone: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val dueMileage = item.lastMileage + item.mileageInterval
+    val isOverdue = item.mileageInterval > 0 && currentMileage >= dueMileage
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = if (isOverdue) CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+        ) else CardDefaults.cardColors(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                Row {
+                    IconButton(onClick = onToggleNotify) {
+                        Icon(
+                            if (item.notifyEnabled) Icons.Default.Notifications
+                            else Icons.Default.NotificationsOff,
+                            contentDescription = null,
+                            tint = if (item.notifyEnabled) MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    IconButton(onClick = onMarkDone) {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = stringResource(R.string.mark_done),
+                            tint = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            if (item.mileageInterval > 0) {
+                Text(
+                    stringResource(R.string.every_km, item.mileageInterval),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    if (isOverdue) stringResource(R.string.overdue_at, dueMileage)
+                    else stringResource(R.string.next_at_km, dueMileage),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isOverdue) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (item.monthsInterval > 0) {
+                Text(
+                    stringResource(R.string.every_months, item.monthsInterval),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+
+────────────────────────────────────────────────
+Листинг 27 — EditCarDialog.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.components
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.panfil.carlog.R
+import com.panfil.carlog.data.CarDatabase
+import com.panfil.carlog.domain.CarInfo
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditCarDialog(
+    initial: CarInfo,
+    onDismiss: () -> Unit,
+    onSave: (CarInfo) -> Unit,
+) {
+    var selectedBrand by remember { mutableStateOf(initial.brand) }
+    var selectedModel by remember { mutableStateOf(initial.model) }
+    var selectedGeneration by remember { mutableStateOf(initial.generation) }
+    var selectedYearFrom by remember { mutableStateOf(initial.yearFrom) }
+    var selectedYearTo by remember { mutableStateOf(initial.yearTo) }
+    var mileage by remember { mutableStateOf(if (initial.mileage > 0) initial.mileage.toString() else "") }
+
+    var brandExpanded by remember { mutableStateOf(false) }
+    var modelExpanded by remember { mutableStateOf(false) }
+    var generationExpanded by remember { mutableStateOf(false) }
+
+    val brands = remember { CarDatabase.brandNames() }
+    val models = remember(selectedBrand) { CarDatabase.modelsFor(selectedBrand) }
+    val generations = remember(selectedBrand, selectedModel) {
+        CarDatabase.generationsFor(selectedBrand, selectedModel)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.car_info_title)) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = 420.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // Brand logo + name
+                if (selectedBrand.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(CarDatabase.logoFor(selectedBrand)),
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            buildString {
+                                append(selectedBrand)
+                                if (selectedModel.isNotEmpty()) append(" $selectedModel")
+                                if (selectedGeneration.isNotEmpty() && selectedYearFrom > 0) {
+                                    append(" $selectedGeneration ($selectedYearFrom–$selectedYearTo)")
+                                }
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // Brand selector
+                ExposedDropdownMenuBox(
+                    expanded = brandExpanded,
+                    onExpandedChange = { brandExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = selectedBrand,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.brand)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(brandExpanded) },
+                        leadingIcon = if (selectedBrand.isNotEmpty()) {
+                            {
+                                Image(
+                                    painter = painterResource(CarDatabase.logoFor(selectedBrand)),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                )
+                            }
+                        } else null,
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = brandExpanded,
+                        onDismissRequest = { brandExpanded = false },
+                    ) {
+                        brands.forEach { brand ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Image(
+                                            painter = painterResource(CarDatabase.logoFor(brand)),
+                                            contentDescription = brand,
+                                            modifier = Modifier.size(28.dp),
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        Text(brand)
+                                    }
+                                },
+                                onClick = {
+                                    selectedBrand = brand
+                                    selectedModel = ""
+                                    selectedGeneration = ""
+                                    selectedYearFrom = 0
+                                    selectedYearTo = 0
+                                    brandExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Model selector
+                ExposedDropdownMenuBox(
+                    expanded = modelExpanded,
+                    onExpandedChange = { if (selectedBrand.isNotEmpty()) modelExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = selectedModel,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.model_label)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(modelExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        enabled = selectedBrand.isNotEmpty(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = modelExpanded,
+                        onDismissRequest = { modelExpanded = false },
+                    ) {
+                        models.forEach { model ->
+                            DropdownMenuItem(
+                                text = { Text(model.name) },
+                                onClick = {
+                                    selectedModel = model.name
+                                    selectedGeneration = ""
+                                    selectedYearFrom = 0
+                                    selectedYearTo = 0
+                                    modelExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Generation selector
+                ExposedDropdownMenuBox(
+                    expanded = generationExpanded,
+                    onExpandedChange = { if (selectedModel.isNotEmpty()) generationExpanded = it },
+                ) {
+                    val genDisplay = if (selectedGeneration.isNotEmpty() && selectedYearFrom > 0) {
+                        "$selectedGeneration ($selectedYearFrom–$selectedYearTo)"
+                    } else {
+                        selectedGeneration
+                    }
+                    OutlinedTextField(
+                        value = genDisplay,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.generation_label)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(generationExpanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        enabled = selectedModel.isNotEmpty(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = generationExpanded,
+                        onDismissRequest = { generationExpanded = false },
+                    ) {
+                        generations.forEach { gen ->
+                            DropdownMenuItem(
+                                text = { Text("${gen.name} (${gen.yearFrom}–${gen.yearTo})") },
+                                onClick = {
+                                    selectedGeneration = gen.name
+                                    selectedYearFrom = gen.yearFrom
+                                    selectedYearTo = gen.yearTo
+                                    generationExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Mileage input
+                OutlinedTextField(
+                    value = mileage,
+                    onValueChange = { mileage = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.mileage_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onSave(
+                        CarInfo(
+                            brand = selectedBrand,
+                            model = selectedModel,
+                            generation = selectedGeneration,
+                            yearFrom = selectedYearFrom,
+                            yearTo = selectedYearTo,
+                            mileage = mileage.toIntOrNull() ?: 0,
+                        ),
+                    )
+                },
+                enabled = selectedBrand.isNotEmpty(),
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+
+────────────────────────────────────────────────
+Листинг 28 — AddExpenseDialog.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.components
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.panfil.carlog.R
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.ExpenseType
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddExpenseDialog(
+    onDismiss: () -> Unit,
+    onSave: (Expense) -> Unit,
+) {
+    var selectedType by remember { mutableStateOf(ExpenseType.FUEL) }
+    var amount by remember { mutableStateOf("") }
+    var mileage by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var expanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.add_expense)) },
+        text = {
+            Column {
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = it },
+                ) {
+                    OutlinedTextField(
+                        value = selectedType.label,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text(stringResource(R.string.expense_type)) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .menuAnchor(),
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        ExpenseType.entries.forEach { type ->
+                            DropdownMenuItem(
+                                text = { Text(type.label) },
+                                onClick = {
+                                    selectedType = type
+                                    expanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
+                    label = { Text(stringResource(R.string.amount_rub)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = mileage,
+                    onValueChange = { mileage = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.mileage_km)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.description_optional)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val a = amount.toDoubleOrNull() ?: 0.0
+                    if (a > 0) {
+                        onSave(
+                            Expense(
+                                type = selectedType,
+                                amount = a,
+                                mileage = mileage.toIntOrNull() ?: 0,
+                                description = description.trim(),
+                            ),
+                        )
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+
+────────────────────────────────────────────────
+Листинг 29 — AddMaintenanceDialog.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.ui.components
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.panfil.carlog.R
+import com.panfil.carlog.domain.Maintenance
+
+@Composable
+fun AddMaintenanceDialog(
+    onDismiss: () -> Unit,
+    onSave: (Maintenance) -> Unit,
+) {
+    var title by remember { mutableStateOf("") }
+    var mileageInterval by remember { mutableStateOf("") }
+    var monthsInterval by remember { mutableStateOf("") }
+    var lastMileage by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.add_maintenance)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text(stringResource(R.string.maintenance_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = mileageInterval,
+                    onValueChange = { mileageInterval = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.mileage_interval_km)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = monthsInterval,
+                    onValueChange = { monthsInterval = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.months_interval)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = lastMileage,
+                    onValueChange = { lastMileage = it.filter { c -> c.isDigit() } },
+                    label = { Text(stringResource(R.string.last_service_mileage)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (title.isNotBlank()) {
+                        onSave(
+                            Maintenance(
+                                title = title.trim(),
+                                mileageInterval = mileageInterval.toIntOrNull() ?: 0,
+                                monthsInterval = monthsInterval.toIntOrNull() ?: 0,
+                                lastMileage = lastMileage.toIntOrNull() ?: 0,
+                            ),
+                        )
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+
+────────────────────────────────────────────────
+Листинг 30 — PdfReportGenerator.kt
+────────────────────────────────────────────────
+
+package com.panfil.carlog.util
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
+import androidx.core.content.FileProvider
+import com.panfil.carlog.domain.CarInfo
+import com.panfil.carlog.domain.Expense
+import com.panfil.carlog.domain.ExpenseType
+import java.io.File
+import java.text.NumberFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+object PdfReportGenerator {
+
+    private const val PAGE_WIDTH = 595
+    private const val PAGE_HEIGHT = 842
+    private const val MARGIN = 40f
+    private const val LINE_HEIGHT = 18f
+
+    private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+    private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
+
+    private val titlePaint = Paint().apply {
+        textSize = 20f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        isAntiAlias = true
+    }
+
+    private val headerPaint = Paint().apply {
+        textSize = 14f
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        isAntiAlias = true
+    }
+
+    private val bodyPaint = Paint().apply {
+        textSize = 11f
+        isAntiAlias = true
+    }
+
+    private val smallPaint = Paint().apply {
+        textSize = 10f
+        color = 0xFF666666.toInt()
+        isAntiAlias = true
+    }
+
+    private val linePaint = Paint().apply {
+        color = 0xFFCCCCCC.toInt()
+        strokeWidth = 0.5f
+    }
+
+    fun generateAndShare(
+        context: Context,
+        expenses: List<Expense>,
+        carInfo: CarInfo,
+        periodLabel: String,
+    ) {
+        val file = generate(context, expenses, carInfo, periodLabel)
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "CarLog — Отчёт о расходах")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, "Поделиться отчётом").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+    }
+
+    private fun generate(
+        context: Context,
+        expenses: List<Expense>,
+        carInfo: CarInfo,
+        periodLabel: String,
+    ): File {
+        val doc = PdfDocument()
+        var pageNum = 1
+        var pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNum).create()
+        var page = doc.startPage(pageInfo)
+        var canvas = page.canvas
+        var y = MARGIN + 24f
+
+        fun ensureSpace(needed: Float): Canvas {
+            if (y + needed > PAGE_HEIGHT - MARGIN) {
+                doc.finishPage(page)
+                pageNum++
+                pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, pageNum).create()
+                page = doc.startPage(pageInfo)
+                canvas = page.canvas
+                y = MARGIN
+            }
+            return canvas
+        }
+
+        // Title
+        canvas.drawText("Отчёт о расходах — CarLog", MARGIN, y, titlePaint)
+        y += LINE_HEIGHT * 2
+
+        // Car info
+        if (carInfo.brand.isNotEmpty()) {
+            canvas.drawText(
+                "${carInfo.brand} ${carInfo.model} ${carInfo.generation}",
+                MARGIN, y, headerPaint,
+            )
+            y += LINE_HEIGHT
+            canvas.drawText("Пробег: ${formatNumber(carInfo.mileage)} км", MARGIN, y, bodyPaint)
+            y += LINE_HEIGHT * 1.5f
+        }
+
+        // Period
+        canvas.drawText("Период: $periodLabel", MARGIN, y, headerPaint)
+        y += LINE_HEIGHT * 1.5f
+
+        // Total
+        val total = expenses.sumOf { it.amount }
+        canvas.drawText("Общая сумма: ${currencyFormat.format(total)}", MARGIN, y, headerPaint)
+        y += LINE_HEIGHT * 2
+
+        // By type
+        val byType = expenses
+            .groupBy { it.type }
+            .mapValues { (_, list) -> list.sumOf { it.amount } }
+            .entries.sortedByDescending { it.value }
+
+        if (byType.isNotEmpty()) {
+            ensureSpace(LINE_HEIGHT * (byType.size + 2))
+            canvas.drawText("Расходы по категориям:", MARGIN, y, headerPaint)
+            y += LINE_HEIGHT * 1.2f
+
+            byType.forEach { (type, amount) ->
+                ensureSpace(LINE_HEIGHT)
+                canvas.drawText(
+                    "  ${type.label}: ${currencyFormat.format(amount)}",
+                    MARGIN, y, bodyPaint,
+                )
+                y += LINE_HEIGHT
+            }
+            y += LINE_HEIGHT
+        }
+
+        // Line separator
+        ensureSpace(LINE_HEIGHT * 2)
+        canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, linePaint)
+        y += LINE_HEIGHT
+
+        // Table header
+        canvas.drawText("Дата", MARGIN, y, headerPaint)
+        canvas.drawText("Тип", MARGIN + 80, y, headerPaint)
+        canvas.drawText("Сумма", MARGIN + 240, y, headerPaint)
+        canvas.drawText("Пробег", MARGIN + 360, y, headerPaint)
+        y += LINE_HEIGHT * 0.5f
+        canvas.drawLine(MARGIN, y, PAGE_WIDTH - MARGIN, y, linePaint)
+        y += LINE_HEIGHT * 0.8f
+
+        // Expense rows
+        expenses.sortedByDescending { it.date }.forEach { expense ->
+            val c = ensureSpace(LINE_HEIGHT * 2)
+            val dateStr = Instant.ofEpochMilli(expense.date)
+                .atZone(ZoneId.systemDefault())
+                .format(dateFormatter)
+            c.drawText(dateStr, MARGIN, y, bodyPaint)
+            c.drawText(expense.type.label, MARGIN + 80, y, bodyPaint)
+            c.drawText(currencyFormat.format(expense.amount), MARGIN + 240, y, bodyPaint)
+            if (expense.mileage > 0) {
+                c.drawText("${formatNumber(expense.mileage)} км", MARGIN + 360, y, bodyPaint)
+            }
+            y += LINE_HEIGHT * 0.3f
+            if (expense.description.isNotEmpty()) {
+                y += LINE_HEIGHT * 0.5f
+                c.drawText(expense.description, MARGIN + 10, y, smallPaint)
+            }
+            y += LINE_HEIGHT
+        }
+
+        doc.finishPage(page)
+
+        val dir = File(context.cacheDir, "reports")
+        dir.mkdirs()
+        val file = File(dir, "carlog_report.pdf")
+        file.outputStream().use { doc.writeTo(it) }
+        doc.close()
+        return file
+    }
+
+    private fun formatNumber(n: Int): String =
+        NumberFormat.getNumberInstance(Locale("ru", "RU")).format(n)
+}
+
+
+================================================
+Всего файлов: 30

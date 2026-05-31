@@ -1,0 +1,134 @@
+<resources>
+    <string name="app_name">CarLog</string>
+
+    <!-- Navigation -->
+    <string name="tab_home">Главная</string>
+    <string name="tab_expenses">Расходы</string>
+    <string name="tab_analytics">Аналитика</string>
+    <string name="tab_maintenance">ТО</string>
+
+    <!-- Home -->
+    <string name="car_info_title">Информация об автомобиле</string>
+    <string name="current_mileage">Текущий пробег: %1$d км</string>
+    <string name="no_car_info">Добавьте информацию об автомобиле</string>
+    <string name="edit_car">Редактировать</string>
+    <string name="next_maintenance">Следующее ТО</string>
+    <string name="no_upcoming_maintenance">Нет предстоящих ТО</string>
+    <string name="expenses_title">Расходы</string>
+    <string name="monthly_expenses">Расходы за месяц: %1$s</string>
+    <string name="toggle_theme">Сменить тему</string>
+
+    <!-- Car Edit -->
+    <string name="brand">Марка</string>
+    <string name="model_label">Модель</string>
+    <string name="generation_label">Поколение</string>
+    <string name="year_label">Год выпуска</string>
+    <string name="mileage_label">Текущий пробег (км)</string>
+    <string name="save">Сохранить</string>
+    <string name="cancel">Отмена</string>
+
+    <!-- Expenses -->
+    <string name="add_expense">Добавить расход</string>
+    <string name="expense_type">Тип расхода</string>
+    <string name="amount_rub">Сумма (₽)</string>
+    <string name="mileage_km">Пробег (км)</string>
+    <string name="description_optional">Описание (необязательно)</string>
+    <string name="no_expenses">Нет записей о расходах</string>
+    <string name="delete">Удалить</string>
+
+    <!-- Analytics -->
+    <string name="total_expenses">Общие расходы</string>
+    <string name="monthly_label">За месяц: %1$s</string>
+    <string name="yearly_label">За год: %1$s</string>
+    <string name="expenses_by_type">Расходы по типам</string>
+    <string name="no_data">Нет данных</string>
+    <string name="recommendations">Рекомендации</string>
+
+    <!-- Maintenance -->
+    <string name="add_maintenance">Добавить ТО</string>
+    <string name="maintenance_name">Название</string>
+    <string name="mileage_interval_km">Интервал (км)</string>
+    <string name="months_interval">Интервал (месяцы)</string>
+    <string name="last_service_mileage">Пробег при последнем ТО (км)</string>
+    <string name="every_km">Каждые %1$d км</string>
+    <string name="every_months">Каждые %1$d мес.</string>
+    <string name="next_at_km">Следующее при %1$d км</string>
+    <string name="overdue">Просрочено</string>
+    <string name="overdue_at">Просрочено! Было нужно при %1$d км</string>
+    <string name="at_mileage">при %1$d км</string>
+    <string name="mark_done">Выполнено</string>
+
+    <!-- Expense Filter -->
+    <string name="filter_all">Все</string>
+    <string name="filter_week">Неделя</string>
+    <string name="filter_month">Месяц</string>
+    <string name="filter_quarter">Квартал</string>
+    <string name="filter_year">Год</string>
+    <string name="filter_custom">Период</string>
+    <string name="filter_from">С</string>
+    <string name="filter_to">По</string>
+    <string name="total_for_period">Итого за период: %1$s</string>
+    <string name="export_pdf">Экспорт в PDF</string>
+    <string name="pdf_report_title">Отчёт о расходах</string>
+    <string name="pdf_shared">PDF-отчёт готов</string>
+    <string name="select_date">Выберите дату</string>
+    <string name="no_expenses_for_period">Нет расходов за выбранный период</string>
+
+    <!-- Recommendations -->
+    <string name="recommendations_title">Рекомендации по ТО</string>
+    <string name="rec_overdue">Просрочено</string>
+    <string name="rec_upcoming">Скоро</string>
+    <string name="rec_ok">В норме</string>
+    <string name="rec_every_km">Каждые %1$s км</string>
+    <string name="rec_every_months">Каждые %1$d мес.</string>
+    <string name="rec_next_at">Следующее при %1$s км</string>
+    <string name="rec_overdue_detail">Просрочено на %1$s км</string>
+    <string name="rec_no_data">Добавьте пробег для получения рекомендаций</string>
+    <string name="rec_remaining">Осталось %1$s км до замены</string>
+    <string name="rec_remaining_at">Осталось %1$s км · при %2$s км</string>
+    <string name="rec_mark_done">Сделал замену</string>
+    <string name="rec_done_at">Заменено на %1$s км · след. при %2$s км</string>
+    <string name="rec_summary_overdue">Просрочено: %1$d</string>
+    <string name="rec_summary_soon">Скоро: %1$d</string>
+    <string name="rec_summary_ok">В норме: %1$d</string>
+    <string name="rec_all_done">Все рекомендации выполнены</string>
+    <string name="rec_dismiss_all">Убрать все рекомендации</string>
+    <string name="rec_restore_all">Восстановить рекомендации</string>
+
+    <!-- Home redesign -->
+    <string name="current_mileage_label">Текущий пробег</string>
+    <string name="add_car_subtitle">Добавьте марку, модель и пробег, чтобы начать</string>
+    <string name="qa_expenses">Расход</string>
+    <string name="qa_maintenance">ТО</string>
+    <string name="qa_analytics">Аналитика</string>
+    <string name="stat_monthly">За месяц</string>
+    <string name="stat_monthly_sub">все расходы</string>
+    <string name="stat_mileage">Пробег</string>
+    <string name="stat_mileage_sub">всего</string>
+    <string name="stat_overdue">Просрочено</string>
+    <string name="stat_overdue_sub_warn">требует внимания</string>
+    <string name="stat_overdue_sub_ok">всё в норме</string>
+    <string name="stat_upcoming">Плановое ТО</string>
+    <string name="stat_upcoming_sub">в плане</string>
+    <string name="see_all">Все</string>
+    <string name="maintenance_empty_hint">Добавьте плановое ТО, чтобы получать напоминания</string>
+
+    <!-- Expenses redesign -->
+    <string name="period_total">Итого</string>
+    <string name="period_count">записей: %1$d</string>
+    <string name="add_short">Добавить</string>
+    <string name="empty_expenses_title">Пока пусто</string>
+    <string name="empty_expenses_hint">Нажмите «+», чтобы добавить первый расход</string>
+    <string name="mileage_bumped_to">Пробег обновлён до %1$d км</string>
+    <string name="mileage_recalculated_to">Пробег пересчитан: %1$d км</string>
+
+    <!-- Maintenance redesign -->
+    <string name="maint_count_total">Всего: %1$d</string>
+    <string name="maint_count_overdue">Просрочено: %1$d</string>
+    <string name="maint_count_ok">В порядке: %1$d</string>
+    <string name="maint_status_overdue">Просрочено</string>
+    <string name="maint_status_ok">В порядке</string>
+    <string name="maint_no_interval">Без интервала</string>
+    <string name="empty_maintenance_title">Тут будут плановые ТО</string>
+    <string name="empty_maintenance_hint">Добавьте пункт, чтобы видеть прогресс и получать напоминания</string>
+</resources>

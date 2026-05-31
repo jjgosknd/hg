@@ -1,0 +1,77 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches:
+      - fix/maintenance-reset-and-ui
+    paths:
+      - 'carlog-source/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('carlog-source/android/**/*.gradle*', 'carlog-source/android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Make gradlew executable
+        working-directory: carlog-source/android
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        working-directory: carlog-source/android
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Locate built APK
+        id: locate
+        run: |
+          APK="$(find carlog-source/android/app/build/outputs/apk/debug -name '*.apk' | head -n1)"
+          echo "Built APK: $APK"
+          test -n "$APK"
+          cp "$APK" carlog-debug.apk
+          echo "apk=carlog-debug.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: carlog-debug-apk
+          path: carlog-debug.apk
+
+      - name: Commit APK back to branch
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add carlog-debug.apk
+          if git diff --cached --quiet; then
+            echo "APK unchanged, nothing to commit"
+          else
+            git commit -m "ci: rebuild debug APK"
+            git push origin HEAD:${GITHUB_REF#refs/heads/}
+          fi
