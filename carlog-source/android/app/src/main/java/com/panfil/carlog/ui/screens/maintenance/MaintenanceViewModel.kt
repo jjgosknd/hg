@@ -41,6 +41,10 @@ class MaintenanceViewModel @Inject constructor(
     fun addMaintenance(m: Maintenance) {
         viewModelScope.launch {
             repository.addMaintenance(m)
+            // Если пользователь указал пробег последнего ТО больше текущего —
+            // подтягиваем общий пробег машины. (Если меньше — это запись
+            // о прошлом ТО, пробег машины не трогаем.)
+            repository.bumpMileageIfHigher(m.lastMileage)
             _showAdd.value = false
         }
     }
@@ -63,6 +67,9 @@ class MaintenanceViewModel @Inject constructor(
                     lastDate = System.currentTimeMillis(),
                 ),
             )
+            // На всякий случай: если по какой-то причине вызывающий передал
+            // пробег больше сохранённого — обновим и общий пробег машины.
+            repository.bumpMileageIfHigher(currentMileage)
         }
     }
 }

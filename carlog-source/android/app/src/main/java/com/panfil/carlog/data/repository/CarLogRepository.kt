@@ -7,6 +7,7 @@ import com.panfil.carlog.domain.CarInfo
 import com.panfil.carlog.domain.Expense
 import com.panfil.carlog.domain.Maintenance
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -78,6 +79,23 @@ class CarLogRepository @Inject constructor(
     suspend fun getMaintenanceById(id: Long) = maintenanceDao.getById(id)
 
     suspend fun saveCarInfo(info: CarInfo) = prefsStore.saveCarInfo(info)
+
+    /**
+     * Если переданный пробег больше текущего сохранённого — обновляет
+     * carInfo.mileage до этого значения. Возвращает true, если обновление
+     * произошло. Используется при внесении расхода/ТО с указанным пробегом,
+     * чтобы пробег машины автоматически подтягивался к актуальному.
+     */
+    suspend fun bumpMileageIfHigher(km: Int): Boolean {
+        if (km <= 0) return false
+        val current = prefsStore.carInfo.first()
+        if (km > current.mileage) {
+            prefsStore.saveCarInfo(current.copy(mileage = km))
+            return true
+        }
+        return false
+    }
+
     suspend fun setDarkTheme(dark: Boolean) = prefsStore.setDarkTheme(dark)
     suspend fun setUseSystemTheme(use: Boolean) = prefsStore.setUseSystemTheme(use)
 

@@ -119,6 +119,7 @@
     <string name="add_short">Добавить</string>
     <string name="empty_expenses_title">Пока пусто</string>
     <string name="empty_expenses_hint">Нажмите «+», чтобы добавить первый расход</string>
+    <string name="mileage_bumped_to">Пробег обновлён до %1$d км</string>
 
     <!-- Maintenance redesign -->
     <string name="maint_count_total">Всего: %1$d</string>

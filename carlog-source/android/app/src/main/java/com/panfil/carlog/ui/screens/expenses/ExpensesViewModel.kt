@@ -8,11 +8,14 @@ import com.panfil.carlog.domain.Expense
 import com.panfil.carlog.domain.FilterPeriod
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -34,6 +37,11 @@ data class ExpensesUiState(
     val showEndPicker: Boolean = false,
 )
 
+sealed interface ExpensesEvent {
+    /** Пробег машины был обновлён до указанного значения автоматически. */
+    data class MileageUpdated(val newMileage: Int) : ExpensesEvent
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ExpensesViewModel @Inject constructor(
@@ -46,6 +54,10 @@ class ExpensesViewModel @Inject constructor(
     private val _customEnd = MutableStateFlow<LocalDate?>(null)
     private val _showStartPicker = MutableStateFlow(false)
     private val _showEndPicker = MutableStateFlow(false)
+
+    /** События для UI: например, "пробег машины обновлён до X км". */
+    private val _events = Channel<ExpensesEvent>(Channel.BUFFERED)
+    val events: Flow<ExpensesEvent> = _events.receiveAsFlow()
 
     private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
     private val zone = ZoneId.systemDefault()
@@ -113,6 +125,13 @@ class ExpensesViewModel @Inject constructor(
     fun addExpense(expense: Expense) {
         viewModelScope.launch {
             repository.addExpense(expense)
+            // Если пробег в расходе больше текущего у машины — апдейтим машину,
+            // чтобы все остальные экраны (главная, рекомендации, ТО) считали
+            // от свежего пробега.
+            val bumped = repository.bumpMileageIfHigher(expense.mileage)
+            if (bumped) {
+                _events.trySend(ExpensesEvent.MileageUpdated(expense.mileage))
+            }
             _showAdd.value = false
         }
     }
