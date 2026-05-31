@@ -1,10 +1,16 @@
 package com.panfil.carlog.ui.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +35,7 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,8 +46,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +79,7 @@ import com.panfil.carlog.ui.theme.BrandViolet
 import java.text.NumberFormat
 import java.time.LocalTime
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("ru", "RU"))
 private val numberFormat = NumberFormat.getNumberInstance(Locale("ru", "RU"))
@@ -79,6 +91,19 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Трекаем рост пробега, чтобы коротко мигнуть бейджем "+X км" на hero-карточке.
+    var prevMileage by rememberSaveable { mutableIntStateOf(-1) }
+    var bumpDelta by remember { mutableIntStateOf(0) }
+    val currMileage = state.carInfo.mileage
+    LaunchedEffect(currMileage) {
+        if (prevMileage in 1 until currMileage) {
+            bumpDelta = currMileage - prevMileage
+            delay(4000)
+            bumpDelta = 0
+        }
+        prevMileage = currMileage
+    }
 
     Column(
         modifier = Modifier
@@ -116,6 +141,7 @@ fun HomeScreen(
                 yearFrom = state.carInfo.yearFrom,
                 yearTo = state.carInfo.yearTo,
                 mileage = state.carInfo.mileage,
+                bumpDelta = bumpDelta,
                 onEdit = { viewModel.showEditDialog() },
             )
         }
@@ -207,6 +233,7 @@ private fun HeroMileageCard(
     yearFrom: Int,
     yearTo: Int,
     mileage: Int,
+    bumpDelta: Int,
     onEdit: () -> Unit,
 ) {
     Card(
@@ -321,6 +348,54 @@ private fun HeroMileageCard(
                         }
                     }
                 }
+            }
+
+            // Floating "+X км" badge that appears for ~4 sec when mileage grows.
+            BumpBadge(
+                visible = bumpDelta > 0,
+                delta = bumpDelta,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 56.dp, end = 20.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun BoxScope.BumpBadge(
+    visible: Boolean,
+    delta: Int,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { -it / 2 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 2 }),
+        modifier = modifier,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = BrandEmerald,
+            shadowElevation = 8.dp,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Default.TrendingUp,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(14.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "+${numberFormat.format(delta)} км",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
     }

@@ -7,6 +7,7 @@ import com.panfil.carlog.domain.CarInfo
 import com.panfil.carlog.domain.Expense
 import com.panfil.carlog.domain.Maintenance
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.ZoneId
@@ -21,7 +22,31 @@ class CarLogRepository @Inject constructor(
 ) {
     val allExpenses: Flow<List<Expense>> = expenseDao.getAll()
     val allMaintenance: Flow<List<Maintenance>> = maintenanceDao.getAll()
-    val carInfo: Flow<CarInfo> = prefsStore.carInfo
+
+    /**
+     * "Эффективный" пробег машины = максимум из:
+     *  - вручную заданного значения (EditCarDialog),
+     *  - самого большого пробега в записях о расходах,
+     *  - самого большого пробега из записей о выполненных ТО.
+     *
+     * Благодаря этому:
+     *  - при добавлении расхода/ТО с большим пробегом главная сразу
+     *    подтягивается;
+     *  - при удалении записей пробег пересчитывается автоматически
+     *    (берётся следующий по величине из оставшихся).
+     */
+    val carInfo: Flow<CarInfo> = combine(
+        prefsStore.carInfo,
+        expenseDao.maxMileage(),
+        maintenanceDao.maxMileage(),
+    ) { manual, maxExp, maxMaint ->
+        val effective = maxOf(manual.mileage, maxExp ?: 0, maxMaint ?: 0)
+        manual.copy(mileage = effective)
+    }
+
+    /** Чистое значение, которое реально лежит в Prefs. Нужно для EditCarDialog. */
+    val carInfoManual: Flow<CarInfo> = prefsStore.carInfo
+
     val darkTheme: Flow<Boolean> = prefsStore.darkTheme
     val useSystemTheme: Flow<Boolean> = prefsStore.useSystemTheme
     val dismissedRecommendations: Flow<Set<String>> = prefsStore.dismissedRecommendations
@@ -81,20 +106,10 @@ class CarLogRepository @Inject constructor(
     suspend fun saveCarInfo(info: CarInfo) = prefsStore.saveCarInfo(info)
 
     /**
-     * Если переданный пробег больше текущего сохранённого — обновляет
-     * carInfo.mileage до этого значения. Возвращает true, если обновление
-     * произошло. Используется при внесении расхода/ТО с указанным пробегом,
-     * чтобы пробег машины автоматически подтягивался к актуальному.
+     * Возвращает текущее эффективное значение пробега. Полезно, когда
+     * нужно сравнить ввод пользователя с тем, что было до операции.
      */
-    suspend fun bumpMileageIfHigher(km: Int): Boolean {
-        if (km <= 0) return false
-        val current = prefsStore.carInfo.first()
-        if (km > current.mileage) {
-            prefsStore.saveCarInfo(current.copy(mileage = km))
-            return true
-        }
-        return false
-    }
+    suspend fun currentEffectiveMileage(): Int = carInfo.first().mileage
 
     suspend fun setDarkTheme(dark: Boolean) = prefsStore.setDarkTheme(dark)
     suspend fun setUseSystemTheme(use: Boolean) = prefsStore.setUseSystemTheme(use)

@@ -73,18 +73,18 @@ fun AddMaintenanceDialog(
             }
         },
         confirmButton = {
+            val isValid = title.isNotBlank()
             TextButton(
+                enabled = isValid,
                 onClick = {
-                    if (title.isNotBlank()) {
-                        onSave(
-                            Maintenance(
-                                title = title.trim(),
-                                mileageInterval = mileageInterval.toIntOrNull() ?: 0,
-                                monthsInterval = monthsInterval.toIntOrNull() ?: 0,
-                                lastMileage = lastMileage.toIntOrNull() ?: 0,
-                            ),
-                        )
-                    }
+                    onSave(
+                        Maintenance(
+                            title = title.trim(),
+                            mileageInterval = mileageInterval.toIntOrNull() ?: 0,
+                            monthsInterval = monthsInterval.toIntOrNull() ?: 0,
+                            lastMileage = lastMileage.toIntOrNull() ?: 0,
+                        ),
+                    )
                 },
             ) {
                 Text(stringResource(R.string.save))

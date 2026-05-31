@@ -16,6 +16,9 @@ interface MaintenanceDao {
     @Query("SELECT * FROM maintenance WHERE id = :id")
     suspend fun getById(id: Long): Maintenance?
 
+    @Query("SELECT MAX(lastMileage) FROM maintenance")
+    fun maxMileage(): Flow<Int?>
+
     @Insert
     suspend fun insert(maintenance: Maintenance): Long
 

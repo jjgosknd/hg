@@ -40,6 +40,9 @@ data class ExpensesUiState(
 sealed interface ExpensesEvent {
     /** Пробег машины был обновлён до указанного значения автоматически. */
     data class MileageUpdated(val newMileage: Int) : ExpensesEvent
+
+    /** Пробег пересчитан после удаления записи (стал меньше). */
+    data class MileageRecalculated(val newMileage: Int) : ExpensesEvent
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -124,12 +127,12 @@ class ExpensesViewModel @Inject constructor(
 
     fun addExpense(expense: Expense) {
         viewModelScope.launch {
+            // Запоминаем "до" — чтобы понять, поднял ли расход пробег.
+            val prevEffective = repository.currentEffectiveMileage()
             repository.addExpense(expense)
-            // Если пробег в расходе больше текущего у машины — апдейтим машину,
-            // чтобы все остальные экраны (главная, рекомендации, ТО) считали
-            // от свежего пробега.
-            val bumped = repository.bumpMileageIfHigher(expense.mileage)
-            if (bumped) {
+            // Эффективный пробег пересчитывается автоматически через Flow,
+            // поэтому здесь нам нужно лишь решить — показывать снэк-бар или нет.
+            if (expense.mileage > 0 && expense.mileage > prevEffective) {
                 _events.trySend(ExpensesEvent.MileageUpdated(expense.mileage))
             }
             _showAdd.value = false
@@ -137,7 +140,17 @@ class ExpensesViewModel @Inject constructor(
     }
 
     fun deleteExpense(expense: Expense) {
-        viewModelScope.launch { repository.deleteExpense(expense) }
+        viewModelScope.launch {
+            val prevEffective = repository.currentEffectiveMileage()
+            repository.deleteExpense(expense)
+            // Если удалённая запись была "тем самым максимумом" — пробег сам
+            // откатится через Flow. Сообщим пользователю об этом, чтобы он
+            // не подумал, что что-то сломалось.
+            val newEffective = repository.currentEffectiveMileage()
+            if (newEffective < prevEffective) {
+                _events.trySend(ExpensesEvent.MileageRecalculated(newEffective))
+            }
+        }
     }
 
     private fun buildPeriodLabel(period: FilterPeriod, start: LocalDate?, end: LocalDate?): String {

@@ -31,12 +31,20 @@ import com.panfil.carlog.domain.ExpenseType
 fun AddExpenseDialog(
     onDismiss: () -> Unit,
     onSave: (Expense) -> Unit,
+    /** Текущий пробег машины. Будет подставлен в поле как подсказка. */
+    currentMileage: Int = 0,
 ) {
     var selectedType by remember { mutableStateOf(ExpenseType.FUEL) }
     var amount by remember { mutableStateOf("") }
-    var mileage by remember { mutableStateOf("") }
+    var mileage by remember {
+        mutableStateOf(if (currentMileage > 0) currentMileage.toString() else "")
+    }
     var description by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
+
+    // Принимаем и точку, и запятую — Russian-friendly.
+    val parsedAmount = amount.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val isValid = parsedAmount > 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -75,11 +83,15 @@ fun AddExpenseDialog(
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = amount,
-                    onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' } },
+                    // Разрешаем цифры, точку И запятую.
+                    onValueChange = { input ->
+                        amount = input.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                    },
                     label = { Text(stringResource(R.string.amount_rub)) },
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
+                    isError = amount.isNotEmpty() && !isValid,
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
@@ -102,18 +114,16 @@ fun AddExpenseDialog(
         },
         confirmButton = {
             TextButton(
+                enabled = isValid,
                 onClick = {
-                    val a = amount.toDoubleOrNull() ?: 0.0
-                    if (a > 0) {
-                        onSave(
-                            Expense(
-                                type = selectedType,
-                                amount = a,
-                                mileage = mileage.toIntOrNull() ?: 0,
-                                description = description.trim(),
-                            ),
-                        )
-                    }
+                    onSave(
+                        Expense(
+                            type = selectedType,
+                            amount = parsedAmount,
+                            mileage = mileage.toIntOrNull() ?: 0,
+                            description = description.trim(),
+                        ),
+                    )
                 },
             ) {
                 Text(stringResource(R.string.save))

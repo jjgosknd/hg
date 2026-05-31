@@ -19,6 +19,9 @@ interface ExpenseDao {
     @Query("SELECT SUM(amount) FROM expenses WHERE date >= :startMs AND date < :endMs")
     fun totalInRange(startMs: Long, endMs: Long): Flow<Double?>
 
+    @Query("SELECT MAX(mileage) FROM expenses")
+    fun maxMileage(): Flow<Int?>
+
     @Insert
     suspend fun insert(expense: Expense): Long
 

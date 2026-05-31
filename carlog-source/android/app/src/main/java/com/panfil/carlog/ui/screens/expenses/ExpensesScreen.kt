@@ -95,6 +95,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val mileageBumpedTemplate = stringResource(R.string.mileage_bumped_to)
+    val mileageRecalcTemplate = stringResource(R.string.mileage_recalculated_to)
 
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
@@ -102,6 +103,11 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
                 is ExpensesEvent.MileageUpdated -> {
                     snackbarHostState.showSnackbar(
                         message = mileageBumpedTemplate.format(event.newMileage),
+                    )
+                }
+                is ExpensesEvent.MileageRecalculated -> {
+                    snackbarHostState.showSnackbar(
+                        message = mileageRecalcTemplate.format(event.newMileage),
                     )
                 }
             }
@@ -225,6 +231,7 @@ fun ExpensesScreen(viewModel: ExpensesViewModel = hiltViewModel()) {
         AddExpenseDialog(
             onDismiss = { viewModel.hideAddDialog() },
             onSave = { viewModel.addExpense(it) },
+            currentMileage = state.carInfo.mileage,
         )
     }
 
